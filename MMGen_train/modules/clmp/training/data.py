@@ -1025,25 +1025,68 @@ def get_toy_dataset(args, model_cfg, is_train):
     return DataInfo(dataloader, sampler)
 
 
+# def get_dataset_fn(data_path, dataset_type):
+#     if dataset_type == "webdataset":
+#         return get_wds_dataset
+#     elif dataset_type == "csv":
+#         return get_csv_dataset
+#     elif dataset_type == "auto":
+#         ext = data_path.split(".")[-1]
+#         if ext in ["csv", "tsv"]:
+#             return get_csv_dataset
+#         elif ext in ["tar"]:
+#             return get_wds_dataset
+#         else:
+#             raise ValueError(
+#                 f"Tried to figure out dataset type, but failed for extention {ext}."
+#             )
+#     elif dataset_type == "toy":
+#         return get_toy_dataset
+#     else:
+#         raise ValueError(f"Unsupported dataset type: {dataset_type}")
+
 def get_dataset_fn(data_path, dataset_type):
-    if dataset_type == "webdataset":
-        return get_wds_dataset
-    elif dataset_type == "csv":
-        return get_csv_dataset
-    elif dataset_type == "auto":
-        ext = data_path.split(".")[-1]
-        if ext in ["csv", "tsv"]:
-            return get_csv_dataset
-        elif ext in ["tar"]:
+    try:
+        print(f"get_dataset_fn called with:")
+        print(f"  data_path: {data_path}")
+        print(f"  dataset_type: {dataset_type}")
+
+        if dataset_type == "webdataset":
+            print("Returning get_wds_dataset function for dataset_type: webdataset")
             return get_wds_dataset
+        elif dataset_type == "csv":
+            print("Returning get_csv_dataset function for dataset_type: csv")
+            return get_csv_dataset
+        elif dataset_type == "auto":
+            try:
+                ext = data_path.split(".")[-1]
+                print(f"Determined file extension: {ext}")
+                if ext in ["csv", "tsv"]:
+                    print("Returning get_csv_dataset function for file extension: csv/tsv")
+                    return get_csv_dataset
+                elif ext in ["tar"]:
+                    print("Returning get_wds_dataset function for file extension: tar")
+                    return get_wds_dataset
+                else:
+                    raise ValueError(
+                        f"Tried to figure out dataset type, but failed for extension {ext}."
+                    )
+            except Exception as e:
+                print(f"Error processing dataset_type: auto, data_path: {data_path}")
+                print(f"Exception: {e}")
+                raise
+        elif dataset_type == "toy":
+            print("Returning get_toy_dataset function for dataset_type: toy")
+            return get_toy_dataset
         else:
-            raise ValueError(
-                f"Tried to figure out dataset type, but failed for extention {ext}."
-            )
-    elif dataset_type == "toy":
-        return get_toy_dataset
-    else:
-        raise ValueError(f"Unsupported dataset type: {dataset_type}")
+            raise ValueError(f"Unsupported dataset type: {dataset_type}")
+    except ValueError as ve:
+        print(f"ValueError: {ve}")
+        raise
+    except Exception as e:
+        print(f"Unhandled exception in get_dataset_fn: {e}")
+        raise
+
 
 
 def get_data(args, model_cfg):
@@ -1138,6 +1181,7 @@ def get_data(args, model_cfg):
     except Exception as e:
         print(f"Exception in get_data: {e}")
         raise
+    print("This is the data from get_data function===============> ", data)
 
     return data
 
