@@ -93,7 +93,7 @@ class SimpleTokenizer(object):
         self.cache = {t: t for t in special_tokens}
         special = "|".join(special_tokens)
         self.pat = re.compile(
-            special + r"""|'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+""",
+            special + r"""|'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p ]|[^\s\p{L}\p ]+""",
             re.IGNORECASE,
         )
 
