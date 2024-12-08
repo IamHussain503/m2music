@@ -41,8 +41,8 @@ CUDA_VISIBLE_DEVICES=0 python -m training.main \
     --save-top-performance 3 \
     --save-most-recent \
     --dataset-type="webdataset" \
-    --datasetpath='/mnt/data/melody_all/webdataset_tar/dataset' \
-    --melody-path='/mnt/data/melody_all/melody_text' \
+    --datasetpath='/root/Awesome-Music-Generation/MusicSet' \
+    --melody-path='/root/Awesome-Music-Generation/MelodySet/shutil_melody_text_all' \
     --precision="fp32" \
     --batch-size=32 \
     --lr=1e-5 \
@@ -53,15 +53,15 @@ CUDA_VISIBLE_DEVICES=0 python -m training.main \
     --amodel HTSAT-base \
     --tmodel roberta \
     --warmup 3200 \
-    --datasetnames "your-dataset-name" \
+    --datasetnames "MusicSet" \
     --datasetinfos "train" \
     --top-k-checkpoint-select-dataset="<datasetnames>-test" \
     --top-k-checkpoint-select-metric="mAP@10" \
-    --logs 'path-to-logs' \
+    --logs '/root/m2music/log' \
     --seed 3407 \
     --gather-with-grad \
     --optimizer "adam" \
     --data-filling "repeatpad" \
     --data-truncating "rand_trunc" \
-    --resume 'your-path/mg2-clmp.pt' \
+    --resume '/root/Awesome-Music-Generation/data/checkpoints/mg2-clmp.pt' \
     # --collect-audio-melody-feature True
