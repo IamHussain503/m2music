@@ -734,7 +734,8 @@ def get_wds_dataset(
     assert input_shards is not None
 
     if not sizefilepath_ is None:
-        sizefilepath = sizefilepath_
+        sizefilepath = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
+        # sizefilepath = sizefilepath_
     else:
         # sizefilepath = os.path.join(os.path.dirname(input_shards[0]), "sizes.json")
         sizefilepath = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
