@@ -248,6 +248,8 @@ def main():
         enable_fusion=args.enable_fusion,
         fusion_type=args.fusion_type,
     )
+    print("This is the model============> ", model)
+    print("This is the model_cfg================>", model_cfg)
 
     if args.horovod:
         with torch.no_grad():
