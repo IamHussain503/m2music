@@ -1048,51 +1048,96 @@ def get_dataset_fn(data_path, dataset_type):
 
 def get_data(args, model_cfg):
     data = {}
-    print("This is the args =====================> ",args)
+    try:
+        print("This is the args =====================> ", args)
 
-    args.class_index_dict = load_class_label(args.class_label_path)
+        # Load class labels
+        try:
+            args.class_index_dict = load_class_label(args.class_label_path)
+            print("Class labels loaded successfully.")
+        except Exception as e:
+            print(f"Error loading class labels from {args.class_label_path}: {e}")
+            raise
 
-    if args.datasetinfos is None:
-        args.datasetinfos = ["train", "unbalanced_train", "balanced_train"]
-    if args.dataset_type == "webdataset":
-        args.train_data = get_tar_path_from_dataset_name(
-            args.datasetnames,
-            args.datasetinfos,
-            islocal=not args.remotedata,
-            proportion=args.dataset_proportion,
-            dataset_path=args.datasetpath,
-            full_dataset=args.full_train_dataset,
-        )
+        # Default dataset information
+        if args.datasetinfos is None:
+            args.datasetinfos = ["train", "unbalanced_train", "balanced_train"]
+        print(f"Datasetinfos set to: {args.datasetinfos}")
 
-        if args.full_train_dataset is None:
-            args.full_train_dataset = []
-        if args.exclude_eval_dataset is None:
-            args.exclude_eval_dataset = []
-        excluded_eval_datasets = args.full_train_dataset + args.exclude_eval_dataset
+        # Handle webdataset-specific data paths
+        if args.dataset_type == "webdataset":
+            try:
+                args.train_data = get_tar_path_from_dataset_name(
+                    args.datasetnames,
+                    args.datasetinfos,
+                    islocal=not args.remotedata,
+                    proportion=args.dataset_proportion,
+                    dataset_path=args.datasetpath,
+                    full_dataset=args.full_train_dataset,
+                )
+                print("Train data paths resolved successfully.")
+            except Exception as e:
+                print(f"Error resolving train data paths: {e}")
+                raise
 
-        val_dataset_names = (
-            [n for n in args.datasetnames if n not in excluded_eval_datasets]
-            if excluded_eval_datasets
-            else args.datasetnames
-        )
-        args.val_dataset_names = val_dataset_names
-        args.val_data = get_tar_path_from_dataset_name(
-            val_dataset_names,
-            ["valid", "test", "eval"],
-            islocal=not args.remotedata,
-            proportion=1,
-            dataset_path=args.datasetpath,
-            full_dataset=None,
-        )
+            # Handle excluded datasets
+            if args.full_train_dataset is None:
+                args.full_train_dataset = []
+            if args.exclude_eval_dataset is None:
+                args.exclude_eval_dataset = []
+            excluded_eval_datasets = args.full_train_dataset + args.exclude_eval_dataset
 
-    if args.train_data:
-        data["train"] = get_dataset_fn(args.train_data, args.dataset_type)(
-            args, model_cfg, is_train=True
-        )
+            try:
+                val_dataset_names = (
+                    [n for n in args.datasetnames if n not in excluded_eval_datasets]
+                    if excluded_eval_datasets
+                    else args.datasetnames
+                )
+                args.val_dataset_names = val_dataset_names
+                print(f"Validation dataset names resolved: {val_dataset_names}")
+            except Exception as e:
+                print(f"Error resolving validation dataset names: {e}")
+                raise
 
-    if args.val_data:
-        data["valid"] = get_dataset_fn(args.val_data, args.dataset_type)(
-            args, model_cfg, is_train=False
-        )
+            try:
+                args.val_data = get_tar_path_from_dataset_name(
+                    val_dataset_names,
+                    ["valid", "test", "eval"],
+                    islocal=not args.remotedata,
+                    proportion=1,
+                    dataset_path=args.datasetpath,
+                    full_dataset=None,
+                )
+                print("Validation data paths resolved successfully.")
+            except Exception as e:
+                print(f"Error resolving validation data paths: {e}")
+                raise
+
+        # Get train dataset
+        if args.train_data:
+            try:
+                data["train"] = get_dataset_fn(args.train_data, args.dataset_type)(
+                    args, model_cfg, is_train=True
+                )
+                print("Train dataset loaded successfully.")
+            except Exception as e:
+                print(f"Error loading train dataset: {e}")
+                raise
+
+        # Get validation dataset
+        if args.val_data:
+            try:
+                data["valid"] = get_dataset_fn(args.val_data, args.dataset_type)(
+                    args, model_cfg, is_train=False
+                )
+                print("Validation dataset loaded successfully.")
+            except Exception as e:
+                print(f"Error loading validation dataset: {e}")
+                raise
+
+    except Exception as e:
+        print(f"Exception in get_data: {e}")
+        raise
 
     return data
+
