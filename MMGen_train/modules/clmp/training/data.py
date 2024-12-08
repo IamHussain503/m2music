@@ -1048,6 +1048,7 @@ def get_dataset_fn(data_path, dataset_type):
 
 def get_data(args, model_cfg):
     data = {}
+    print("This is the args =====================> ",args)
 
     args.class_index_dict = load_class_label(args.class_label_path)
 
