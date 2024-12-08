@@ -301,7 +301,7 @@ def get_dataset_size(shards, sizefilepath_=None, is_local=True):
                     for s in dataset_split[n]:
                         if s in shards.split("/"):
                             break
-                    sizefilepath_ = f"./json_files/{n}/{s}/sizes.json"
+                    sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
                 except KeyError as e:
                     print(f"KeyError: {e} - Invalid dataset split structure for {shards}")
                     raise
