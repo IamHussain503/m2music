@@ -64,4 +64,4 @@ CUDA_VISIBLE_DEVICES=0 python -m training.main \
     --data-filling "repeatpad" \
     --data-truncating "rand_trunc" \
     --resume '/root/Awesome-Music-Generation/data/checkpoints/mg2-clmp.pt' \
-    # --collect-audio-melody-feature True
+    --collect-audio-melody-feature True
