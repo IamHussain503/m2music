@@ -281,56 +281,80 @@ def preprocess_txt(text):
 
 
 def get_dataset_size(shards, sizefilepath_=None, is_local=True):
-    if isinstance(shards, list):
-        size_list = []
-        for s in shards:
-            size_list.append(
-                get_dataset_size(s, sizefilepath_=sizefilepath_, is_local=is_local)[0]
-            )
-    else:
-        if not is_local:
-            for n in dataset_split.keys():
-                if n in shards.split("/"):
-                    break
-            for s in dataset_split[n]:
-                if s in shards.split("/"):
-                    break
-            sizefilepath_ = f"./json_files/{n}/{s}/sizes.json"
-        shards_list = list(braceexpand.braceexpand(shards))
-        dir_path = os.path.dirname(shards)
-        if sizefilepath_ is not None:
-            sizes = json.load(open(sizefilepath_, "r"))
-            total_size = sum(
-                [
-                    int(sizes[os.path.basename(shard.replace(".tar -", ".tar"))])
-                    for shard in shards_list
-                ]
-            )
+    try:
+        if isinstance(shards, list):
+            size_list = []
+            for s in shards:
+                try:
+                    size_list.append(
+                        get_dataset_size(s, sizefilepath_=sizefilepath_, is_local=is_local)[0]
+                    )
+                except Exception as e:
+                    print(f"Error processing shard {s}: {e}")
+                    raise
         else:
-            sizes_filename = os.path.join(dir_path, "sizes.json")
-            len_filename = os.path.join(dir_path, "__len__")
-            if os.path.exists(sizes_filename):
-                sizes = json.load(open(sizes_filename, "r"))
-                total_size = sum(
-                    [int(sizes[os.path.basename(shard)]) for shard in shards_list]
-                )
-            elif os.path.exists(len_filename):
-                # FIXME this used to be eval(open(...)) but that seemed rather unsafe
-                total_size = ast.literal_eval(open(len_filename, "r").read())
+            if not is_local:
+                try:
+                    for n in dataset_split.keys():
+                        if n in shards.split("/"):
+                            break
+                    for s in dataset_split[n]:
+                        if s in shards.split("/"):
+                            break
+                    sizefilepath_ = f"./json_files/{n}/{s}/sizes.json"
+                except KeyError as e:
+                    print(f"KeyError: {e} - Invalid dataset split structure for {shards}")
+                    raise
+            shards_list = list(braceexpand.braceexpand(shards))
+            dir_path = os.path.dirname(shards)
+            if sizefilepath_ is not None:
+                try:
+                    sizes = json.load(open(sizefilepath_, "r"))
+                    total_size = sum(
+                        [
+                            int(sizes[os.path.basename(shard.replace(".tar -", ".tar"))])
+                            for shard in shards_list
+                        ]
+                    )
+                except FileNotFoundError as e:
+                    print(f"FileNotFoundError: {e} - Could not find sizes.json at {sizefilepath_}")
+                    raise
+                except KeyError as e:
+                    print(f"KeyError: {e} - Missing entry in sizes.json for some shards")
+                    raise
             else:
-                raise Exception(
-                    "Cannot find sizes file for dataset. Please specify the path to the file."
-                )
-                # total_size = None  # num samples undefined
-                # some common dataset sizes (at time of authors last download)
-                # cc3m-train: 2905954
-                # cc12m: 10968539
-                # LAION-400m: 407332084
+                sizes_filename = os.path.join(dir_path, "sizes.json")
+                len_filename = os.path.join(dir_path, "__len__")
+                if os.path.exists(sizes_filename):
+                    try:
+                        sizes = json.load(open(sizes_filename, "r"))
+                        total_size = sum(
+                            [int(sizes[os.path.basename(shard)]) for shard in shards_list]
+                        )
+                    except KeyError as e:
+                        print(f"KeyError: {e} - Missing entry in sizes.json for some shards")
+                        raise
+                elif os.path.exists(len_filename):
+                    try:
+                        total_size = ast.literal_eval(open(len_filename, "r").read())
+                    except SyntaxError as e:
+                        print(f"SyntaxError: {e} - Error evaluating __len__ file")
+                        raise
+                else:
+                    raise Exception(
+                        f"Cannot find sizes file or __len__ file in directory: {dir_path}"
+                    )
         num_shards = len(shards_list)
-    if isinstance(shards, list):
-        return sum(size_list), len(shards)
-    else:
-        return total_size, num_shards
+
+        if isinstance(shards, list):
+            return sum(size_list), len(shards)
+        else:
+            return total_size, num_shards
+
+    except Exception as e:
+        print(f"Exception encountered in get_dataset_size: {e}")
+        raise
+
 
 
 def get_imagenet(args, preprocess_fns, split):
