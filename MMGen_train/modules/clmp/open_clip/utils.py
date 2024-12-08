@@ -96,37 +96,71 @@ def get_tar_path_from_dataset_name(
     """
     Get tar path from dataset name and type
     """
-    output = []
-    for n in dataset_names:
-        if full_dataset is not None and n in full_dataset:
-            current_dataset_types = dataset_split[n]
-        else:
-            current_dataset_types = dataset_types
-        for s in current_dataset_types:
-            tmp = []
-            if islocal:
-                sizefilepath_ = f"{dataset_path}/{n}/{s}/sizes.json"
-                # sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
-                if not os.path.exists(sizefilepath_):
-                    sizefilepath_ = f"/root/Awesome-Music-Generation/MusicSet/{n}/{s}/sizes.json"
-                    # sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
-            else:
-                # sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
-                sizefilepath_ = f"/root/Awesome-Music-Generation/MusicSet/{n}/{s}/sizes.json"
-            if not os.path.exists(sizefilepath_):
-                continue
-            sizes = json.load(open(sizefilepath_, "r"))
-            for k in sizes.keys():
-                if islocal:
-                    tmp.append(f"{dataset_path}/{n}/{s}/{k}")
+    try:
+        print("Function get_tar_path_from_dataset_name called with:")
+        print(f"  dataset_names: {dataset_names}")
+        print(f"  dataset_types: {dataset_types}")
+        print(f"  islocal: {islocal}")
+        print(f"  dataset_path: {dataset_path}")
+        print(f"  proportion: {proportion}")
+        print(f"  full_dataset: {full_dataset}")
+
+        output = []
+        for n in dataset_names:
+            try:
+                print(f"Processing dataset name: {n}")
+                if full_dataset is not None and n in full_dataset:
+                    current_dataset_types = dataset_split[n]
                 else:
-                    tmp.append(
-                        f"pipe:aws s3 --cli-connect-timeout 0 cp s3://s-laion-audio/webdataset_tar/{n}/{s}/{k} -"
-                    )
-            if proportion != 1:
-                tmp = random.sample(tmp, int(proportion * len(tmp)))
-            output.append(tmp)
-    return sum(output, [])
+                    current_dataset_types = dataset_types
+                print(f"  current_dataset_types: {current_dataset_types}")
+
+                for s in current_dataset_types:
+                    try:
+                        print(f"  Processing dataset type: {s}")
+                        tmp = []
+                        if islocal:
+                            sizefilepath_ = f"{dataset_path}/{n}/{s}/sizes.json"
+                            if not os.path.exists(sizefilepath_):
+                                sizefilepath_ = f"/root/Awesome-Music-Generation/MusicSet/{n}/{s}/sizes.json"
+                        else:
+                            sizefilepath_ = f"/root/Awesome-Music-Generation/MusicSet/{n}/{s}/sizes.json"
+
+                        print(f"    sizefilepath_: {sizefilepath_}")
+
+                        if not os.path.exists(sizefilepath_):
+                            print(f"    File not found: {sizefilepath_}")
+                            continue
+
+                        sizes = json.load(open(sizefilepath_, "r"))
+                        print(f"    Loaded sizes.json successfully. Keys: {list(sizes.keys())}")
+
+                        for k in sizes.keys():
+                            if islocal:
+                                tmp.append(f"{dataset_path}/{n}/{s}/{k}")
+                            else:
+                                tmp.append(
+                                    f"pipe:aws s3 --cli-connect-timeout 0 cp s3://s-laion-audio/webdataset_tar/{n}/{s}/{k} -"
+                                )
+
+                        if proportion != 1:
+                            tmp = random.sample(tmp, int(proportion * len(tmp)))
+                            print(f"    Sampled paths: {tmp}")
+
+                        output.append(tmp)
+                    except Exception as e:
+                        print(f"  Error processing dataset type {s} for dataset {n}: {e}")
+                        raise
+            except Exception as e:
+                print(f"Error processing dataset name {n}: {e}")
+                raise
+
+        print(f"Final output: {output}")
+        return sum(output, [])
+    except Exception as e:
+        print(f"Exception in get_tar_path_from_dataset_name: {e}")
+        raise
+
 
 
 def get_tar_path_from_txts(txt_path, islocal, proportion=1):
