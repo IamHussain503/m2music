@@ -1090,7 +1090,7 @@ def get_data(args, model_cfg):
         )
 
     if args.val_data:
-        data["val"] = get_dataset_fn(args.val_data, args.dataset_type)(
+        data["valid"] = get_dataset_fn(args.val_data, args.dataset_type)(
             args, model_cfg, is_train=False
         )
 
