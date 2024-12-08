@@ -76,7 +76,7 @@ def tokenizer(text):
 
 from transformers import RobertaTokenizer
 
-tokenize = RobertaTokenizer.from_pretrained("/mnt/data/wmz/audioldm_clap_repair/AudioLDM-training-finetuning-main/data/checkpoints/roberta-base")
+tokenize = RobertaTokenizer.from_pretrained("roberta-base")
 
 def tokenizer(text):
     result = tokenize(
