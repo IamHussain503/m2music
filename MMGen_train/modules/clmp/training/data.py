@@ -736,7 +736,8 @@ def get_wds_dataset(
     if not sizefilepath_ is None:
         sizefilepath = sizefilepath_
     else:
-        sizefilepath = os.path.join(os.path.dirname(input_shards[0]), "sizes.json")
+        # sizefilepath = os.path.join(os.path.dirname(input_shards[0]), "sizes.json")
+        sizefilepath = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
 
     if proportion != 1.0:
         num_samples, num_shards, input_shards, _ = sample_prop(
