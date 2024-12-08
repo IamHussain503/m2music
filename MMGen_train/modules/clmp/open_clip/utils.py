@@ -105,13 +105,14 @@ def get_tar_path_from_dataset_name(
         for s in current_dataset_types:
             tmp = []
             if islocal:
-                sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
+                sizefilepath_ = f"{dataset_path}/{n}/{s}/sizes.json"
+                # sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
                 if not os.path.exists(sizefilepath_):
-                    # sizefilepath_ = f"./json_files/{n}/{s}/sizes.json"
-                    sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
+                    sizefilepath_ = f"/root/Awesome-Music-Generation/MusicSet/{n}/{s}/sizes.json"
+                    # sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
             else:
-                sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
-                # sizefilepath_ = f"./json_files/{n}/{s}/sizes.json"
+                # sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
+                sizefilepath_ = f"/root/Awesome-Music-Generation/MusicSet/{n}/{s}/sizes.json"
             if not os.path.exists(sizefilepath_):
                 continue
             sizes = json.load(open(sizefilepath_, "r"))

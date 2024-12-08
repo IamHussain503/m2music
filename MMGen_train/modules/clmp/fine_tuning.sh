@@ -53,7 +53,7 @@ CUDA_VISIBLE_DEVICES=0 python -m training.main \
     --amodel HTSAT-base \
     --tmodel roberta \
     --warmup 3200 \
-    --datasetnames "" \
+    --datasetnames "zain" \
     --datasetinfos "train" \
     --top-k-checkpoint-select-dataset="<datasetnames>-test" \
     --top-k-checkpoint-select-metric="mAP@10" \
