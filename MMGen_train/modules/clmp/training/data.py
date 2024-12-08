@@ -378,7 +378,7 @@ def get_dataset_size(shards, sizefilepath_=None, is_local=True):
                         if s in shards.split("/"):
                             break
                     # sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
-                    sizefilepath_ = f"/root/Awesome-Music-Generation/MusicSet/ /{s}/sizes.json"
+                    sizefilepath_ = f"/root/Awesome-Music-Generation/MusicSet/{n}/{s}/sizes.json"
                 except KeyError as e:
                     print(f"KeyError: {e} - Invalid dataset split structure for {shards}")
                     raise
@@ -1092,7 +1092,6 @@ def get_dataset_fn(data_path, dataset_type):
 def get_data(args, model_cfg):
     data = {}
     try:
-        print("This is the args =====================> ", args)
 
         # Load class labels
         try:
@@ -1181,7 +1180,6 @@ def get_data(args, model_cfg):
     except Exception as e:
         print(f"Exception in get_data: {e}")
         raise
-    print("This is the data from get_data function===============> ", data)
 
     return data
 
