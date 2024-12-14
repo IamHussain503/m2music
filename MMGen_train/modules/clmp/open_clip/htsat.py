@@ -1129,6 +1129,9 @@ class HTSAT_Swin_Transformer(nn.Module):
 
         Handles both 'mel_fusion' and 'waveform' input types, adjusts dimensions as needed, and ensures compatibility with further processing.
         """
+        # Get the device dynamically or use a passed device argument
+        device = kwargs.get("device", next(self.parameters()).device)
+
         # Debugging: Check input type and keys
         if not isinstance(x, dict):
             raise TypeError(f"Expected 'x' to be a dictionary but got type {type(x)}.")
@@ -1206,6 +1209,7 @@ class HTSAT_Swin_Transformer(nn.Module):
             "fine_grained_embedding": latent_output,
         }
         return output_dict
+
 
 
 
