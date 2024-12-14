@@ -697,36 +697,38 @@ class CLAP(nn.Module):
             raise RuntimeError(f"Model type {self.text_branch_type} not found.")
         return x
 
-    def forward(self, audio, text, device=None):
-        """Forward audio and text into the CLAP
+    def forward(self, audio, text=None, device=None):
+        """
+        Forward audio and text into the CLAP model.
+
         Parameters
         ----------
-        audio: torch.Tensor (batch_size, audio_length)
-            the time-domain audio input / the batch of mel_spec and longer list.
-        text: torch.Tensor () // need to add
-            the text token input
+        audio: torch.Tensor or dict
+            The time-domain audio input or a dictionary containing mel_spec and longer list.
+        text: torch.Tensor or dict, optional
+            The text token input (e.g., tokenized text).
+        device: torch.device, optional
+            The device on which computations will be performed.
         """
+        # Determine the device
         if device is None:
             if audio is not None:
                 device = audio.device
             elif text is not None:
                 device = text.device
-        
-        # if audio is None and text is None:
-        #     # a hack to get the logit scale
-        #     return self.logit_scale_a.exp(), self.logit_scale_t.exp()
-        # elif audio is None:
-        #     return self.encode_text(text, device=device)
-        # elif text is None:
-        #     return self.audio_projection(
-        #         self.encode_audio(audio, device=device)["embedding"]
-        #     )
-        audio_features = self.audio_projection(
-            self.encode_audio(audio, device=device)["embedding"]
-        )
-        audio_features = F.normalize(audio_features, dim=-1)
 
-        # Check if text data exists and process it
+        # Encode audio features
+        audio_features = self.encode_audio(audio, device=device)["embedding"]
+
+        # Check if audio features need projection to 1024 features
+        if audio_features.shape[-1] == 512:
+            audio_features = nn.Linear(512, 1024).to(device)(audio_features)
+
+        # Normalize and project audio features
+        audio_embeds = self.audio_projection(audio_features)
+        audio_embeds = F.normalize(audio_embeds, dim=-1)
+
+        # Process text features if text is provided
         if text is not None:
             text_features = self.encode_text(text, device=device)
             text_features = F.normalize(text_features, dim=-1)
@@ -735,35 +737,28 @@ class CLAP(nn.Module):
             text_features = None
             text_features_mlp = None
 
-        audio_features_mlp = self.audio_transform(audio_features)
-        
-        # Check if melody data exists and process it
-        if 'melody_text' in audio:
-            melody_features = self.encode_melody(audio["melody_text"], device=device) # [2 ,1024]
+        # Process audio MLP features
+        audio_features_mlp = self.audio_transform(audio_embeds)
+
+        # Check and process melody features if present in audio
+        melody_features = None
+        if isinstance(audio, dict) and "melody_text" in audio:
+            melody_features = self.encode_melody(audio["melody_text"], device=device)  # [batch_size, 1024]
             melody_features = self.melody_mlp_1024_to_768(melody_features)
             melody_features = self.melody_projection(melody_features)
             melody_features = F.normalize(melody_features, dim=-1)
-            
-            return (
+
+        # Return the model outputs
+        return (
             melody_features,
-            audio_features,
+            audio_embeds,
             text_features,
             audio_features_mlp,
             text_features_mlp,
             self.logit_scale_a.exp(),
             self.logit_scale_t.exp(),
         )
-        else:
-            melody_features = None
-            return (
-                melody_features,
-                audio_features,
-                text_features,
-                audio_features_mlp,
-                text_features_mlp,
-                self.logit_scale_a.exp(),
-                self.logit_scale_t.exp(),
-            )
+
 
         # # Four outputs: audio features (basic & MLP), text features (basic & MLP)
         # return (
