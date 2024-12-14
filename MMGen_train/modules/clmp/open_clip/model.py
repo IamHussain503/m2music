@@ -720,8 +720,8 @@ class CLAP(nn.Module):
         # Encode audio features
         audio_features = self.encode_audio(audio, device=device)["embedding"]
 
-        # Check if audio features need projection to 1024 features
-        if audio_features.shape[-1] == 512:
+        # Add a projection layer for compatibility with audio_projection
+        if audio_features.shape[-1] == 512:  # Check if projection is needed
             audio_features = nn.Linear(512, 1024).to(device)(audio_features)
 
         # Normalize and project audio features
@@ -758,6 +758,7 @@ class CLAP(nn.Module):
             self.logit_scale_a.exp(),
             self.logit_scale_t.exp(),
         )
+
 
 
         # # Four outputs: audio features (basic & MLP), text features (basic & MLP)
