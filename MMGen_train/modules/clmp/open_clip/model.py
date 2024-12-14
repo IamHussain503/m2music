@@ -445,6 +445,8 @@ class CLAP(nn.Module):
         self.mlp_act = mlp_act
 
         self.context_length = text_cfg.context_length
+        self.audio_projection_layer = nn.Linear(512, 1024)
+
 
         # OpenAI models are pretrained w/ QuickGELU but native nn.GELU is both faster and more
         # memory efficient in recent PyTorch releases (>= 1.10).
@@ -720,10 +722,9 @@ class CLAP(nn.Module):
         # Encode audio features
         audio_features = self.encode_audio(audio, device=device)["embedding"]
 
-        # Add a projection layer for compatibility with audio_projection
+        # Apply projection layer for compatibility with audio_projection
         if audio_features.shape[-1] == 512:  # Check if projection is needed
-            projection_layer = nn.Linear(512, 1024).to(device)  # Define the projection layer
-            audio_features = projection_layer(audio_features)  # Apply projection
+            audio_features = self.audio_projection_layer(audio_features)
 
         # Normalize and project audio features
         audio_embeds = self.audio_projection(audio_features)
@@ -759,6 +760,7 @@ class CLAP(nn.Module):
             self.logit_scale_a.exp(),
             self.logit_scale_t.exp(),
         )
+
 
 
 
