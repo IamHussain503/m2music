@@ -1136,6 +1136,7 @@ class HTSAT_Swin_Transformer(nn.Module):
                     x = x.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
             elif x.dim() == 2:
                     x = x.unsqueeze(1)  # Add channel dimension
+            print(f"Keys in x:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: {x.keys()}")
             x = self.spectrogram_extractor(x)  # (batch_size, 1, time_steps, freq_bins)
             x = self.logmel_extractor(x)  # (batch_size, 1, time_steps, mel_bins)
             x = x.transpose(1, 3)
@@ -1150,8 +1151,15 @@ class HTSAT_Swin_Transformer(nn.Module):
             x = self.reshape_wav2img(x)
             output_dict = self.forward_features(x)
         else:
+            print(f"Keys in x::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::wwwww {x.keys()}")
             longer_list = x["longer"].to(device=device, non_blocking=True)
-            x = x["mel_fusion"].to(device=device, non_blocking=True)
+            if "mel_fusion" in x:
+                x = x["mel_fusion"].to(device=device, non_blocking=True)
+            else:
+                # Handle the absence of 'mel_fusion' (e.g., fallback to a default tensor)
+                print("Using default fallback for mel_fusion")
+                x = x["waveform"].to(device=device, non_blocking=True)  # Example fallback
+
             x = x.transpose(1, 3)
             x = self.bn0(x)
             x = x.transpose(1, 3)
