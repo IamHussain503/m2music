@@ -248,6 +248,8 @@ def main():
         enable_fusion=args.enable_fusion,
         fusion_type=args.fusion_type,
     )
+    # print("This is the model============> ", model)
+    # print("This is the model_cfg================>", model_cfg)
 
     if args.horovod:
         with torch.no_grad():
@@ -280,6 +282,7 @@ def main():
         )
 
     data = get_data(args, model_cfg)
+    print("This is the data ===========> ", data)
     assert len(data), "At least one train or eval dataset must be specified."
     if args.trace:
         assert "train" not in data, "Cannot train with traced model"

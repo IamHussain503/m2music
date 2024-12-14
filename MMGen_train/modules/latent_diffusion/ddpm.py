@@ -113,7 +113,8 @@ class DDPM(pl.LightningModule):
         self.first_stage_key = first_stage_key
         self.sampling_rate = sampling_rate
         self.clap = CLAPAudioEmbeddingClassifierFreev2(
-            pretrained_path="data/checkpoints/mmgen-clmp.pt",
+#            pretrained_path="/root/AudioLDM-training-finetuning/data/checkpoints/clap_music_speech_audioset_epoch_15_esc_89.98.pt",
+            pretrained_path="/root/m2music/checkpoints/clmp_epoch_30.pth",
             sampling_rate=self.sampling_rate,
             embed_mode="audio",
             amodel="HTSAT-base",
@@ -1271,9 +1272,9 @@ class LatentDiffusion(DDPM):
                     cond_dict[cond_model_key] = c
         
         # change the melody_npy and melody.faiss to the local path
-        melody_npy = np.load("MMGen/melody.npy")
+        melody_npy = np.load("/root/m2music/clm_data/embeddings/melody_embeddings.npy")
         melody_builder = FaissDatasetBuilder(melody_npy)
-        melody_builder.load_index("MMGen/melody.faiss")
+        melody_builder.load_index("/root/m2music/clm_data/faiss/audio_2_melody_hnsw.faiss")
         # change the melody_npy and melody.faiss to the local path
         
         query = cond_dict['film_clap_cond1']
@@ -1805,7 +1806,7 @@ class LatentDiffusion(DDPM):
             
             elif type(name) is list:
                 max_filename_length = 30  
-                truncated_basename = self.truncate_filename(os.path.basename(name[i]), max_filename_length)
+                truncated_basename = self.truncate_filename(os.path.basename(name[0]), max_filename_length)
 
                 # path = os.path.join(
                 #     savepath,

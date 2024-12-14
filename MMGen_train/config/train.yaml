@@ -1,4 +1,4 @@
-metadata_root: "./data/dataset/metadata/dataset_root.json"
+metadata_root: "/root/AudioLDM-training-finetuning/data/dataset/metadata/dataset_root.json"
 log_directory: "./log/latent_diffusion"
 project: "your_project"
 precision: "high"
@@ -53,7 +53,7 @@ model:
       base_learning_rate: 8.0e-06
       target: MMGen_train.modules.latent_encoder.autoencoder.AutoencoderKL
       params: 
-        reload_from_ckpt: "data/checkpoints/mg2_vae_16k_64bins.ckpt"
+        reload_from_ckpt: "/root/Awesome-Music-Generation/data/checkpoints/mg2_vae_16k_64bins.ckpt"
         sampling_rate: *sampling_rate
         batchsize: 4
         monitor: val/rec_loss
@@ -135,7 +135,7 @@ model:
         conditioning_key: film
         target: MMGen_train.conditional_models.CLAPAudioEmbeddingClassifierFreev2
         params:
-          pretrained_path: data/checkpoints/mg2-clmp.pt
+          pretrained_path: /root/Awesome-Music-Generation/data/checkpoints/mg2-clmp.pt
           sampling_rate: 16000
           embed_mode: text # or text
           amodel: HTSAT-base

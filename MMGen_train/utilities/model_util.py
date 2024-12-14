@@ -267,13 +267,15 @@ def get_vocoder(config, device, mel_bins):
     ROOT = "data/checkpoints"
 
     if mel_bins == 64:
-        model_path = os.path.join(ROOT, "hifigan_16k_64bins")
+#        model_path = os.path.join(ROOT, "hifigan_16k_64bins")
+        model_path = "/root/Awesome-Music-Generation/data/checkpoints/hifigan_16k_64bins"
         with open(model_path + ".json", "r") as f:
             config = json.load(f)
         config = hifigan.AttrDict(config)
         vocoder = hifigan.Generator(config)
     elif mel_bins == 256:
         model_path = os.path.join(ROOT, "hifigan_48k_256bins")
+#        model_path = "/root/Awesome-Music-Generation/data/checkpoints/hifigan_16k_64bins.ckpt"
         with open(model_path + ".json", "r") as f:
             config = json.load(f)
         config = hifigan.AttrDict(config)

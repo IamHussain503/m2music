@@ -1,3 +1,4 @@
+
 import os
 os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 import os
@@ -76,7 +77,7 @@ def tokenizer(text):
 
 from transformers import RobertaTokenizer
 
-tokenize = RobertaTokenizer.from_pretrained("/mnt/data/wmz/audioldm_clap_repair/AudioLDM-training-finetuning-main/data/checkpoints/roberta-base")
+tokenize = RobertaTokenizer.from_pretrained("roberta-base")
 
 def tokenizer(text):
     result = tokenize(
@@ -437,8 +438,17 @@ def sample_prop(sizefile, inputs, proportion, is_local=True):
 
 
 def get_mel(audio_data, audio_cfg):
-    # mel shape: (n_mels, T)
-    mel = torchaudio.transforms.MelSpectrogram(
+    """
+    Compute a log-mel spectrogram from audio_data.
+    audio_data: torch.Tensor of shape (1, T) containing float32 waveform data.
+    audio_cfg: dict with keys:
+        "sample_rate", "window_size", "hop_size", "fmin", "fmax", "mel_bins"
+    """
+    # Ensure audio_data is on a device (CPU or GPU)
+    device = audio_data.device
+
+    # Create a MelSpectrogram transform
+    mel_transform = torchaudio.transforms.MelSpectrogram(
         sample_rate=audio_cfg["sample_rate"],
         n_fft=audio_cfg["window_size"],
         win_length=audio_cfg["window_size"],
@@ -448,115 +458,148 @@ def get_mel(audio_data, audio_cfg):
         power=2.0,
         norm=None,
         onesided=True,
-        n_mels=64,
+        n_mels=audio_cfg.get("mel_bins", 64),
         f_min=audio_cfg["fmin"],
         f_max=audio_cfg["fmax"],
-    ).to(audio_data.device)
-    mel = mel(audio_data)
-    # we use log mel spectrogram as input
-    mel = torchaudio.transforms.AmplitudeToDB(top_db=None)(mel)
-    return mel.T  # (T, n_mels)
+    ).to(device)
+
+    # Compute mel spectrogram: shape (1, n_mels, time_steps)
+    mel = mel_transform(audio_data)
+    # Convert to dB
+    mel = torchaudio.transforms.AmplitudeToDB()(mel)
+    # mel is now (1, n_mels, time_steps)
+    # Transpose to (time_steps, n_mels)
+    mel = mel.squeeze(0).transpose(0, 1)
+    return mel
 
 def get_audio_features(sample, audio_data, max_len, data_truncating, data_filling, audio_cfg, require_grad=False):
     """
-    Calculate and add audio features to sample.
-    Sample: a dict containing all the data of current sample.
-    audio_data: a tensor of shape (T) containing audio data.
-    max_len: the maximum length of audio data.
-    data_truncating: the method of truncating data.
-    data_filling: the method of filling data.
-    audio_cfg: a dict containing audio configuration. Comes from model_cfg['audio_cfg'].
-    require_grad: whether to require gradient for audio data.
-        This is useful when we want to apply gradient-based classifier-guidance.
-    """
-    grad_fn = suppress if require_grad else torch.no_grad
-    with grad_fn():
-        if len(audio_data) > max_len:
-            if data_truncating == "rand_trunc":
-                longer = torch.tensor([True])
+    Process the audio_data and add fields "waveform", "longer", and optionally "mel_fusion" to the sample dict.
 
-            elif data_truncating == "fusion":
-                # fusion
-                mel = get_mel(audio_data, audio_cfg)
-                # split to three parts
-                chunk_frames = max_len // audio_cfg['hop_size'] + 1  # the +1 related to how the spectrogram is computed
-                total_frames = mel.shape[0]
-                if chunk_frames == total_frames:
+    sample: dict to store results
+    audio_data: torch.Tensor containing the audio waveform.
+                 Initially may be (T,), (C,T). We will ensure it is (1,T).
+    max_len: int, the maximum length of audio in samples.
+    data_truncating: str, one of ["rand_trunc", "fusion"]
+    data_filling: str, one of ["pad", "repeat", "repeatpad"]
+    audio_cfg: dict with audio parameters
+    require_grad: bool, if True, operations require gradient (usually False).
+
+    Returns updated sample dict with "waveform", "longer", and possibly "mel_fusion".
+    """
+
+    if not isinstance(sample, dict):
+        sample = dict()
+
+    grad_fn = torch.enable_grad if require_grad else torch.no_grad
+
+    try:
+        # Ensure audio_data is (1,T)
+        if audio_data.dim() == 1:
+            audio_data = audio_data.unsqueeze(0)  # (1,T)
+        elif audio_data.dim() == 2 and audio_data.size(0) > 1:
+            # Average over channels if >1 channel
+            audio_data = audio_data.mean(dim=0, keepdim=True)  # (1,T)
+
+        with grad_fn():
+            length = audio_data.size(-1)
+
+            if length > max_len:
+                # Audio is longer than max_len
+                if data_truncating == "rand_trunc":
+                    longer = torch.tensor([True])
+                    overflow = length - max_len
+                    idx = np.random.randint(0, overflow + 1)
+                    audio_data = audio_data[:, idx: idx + max_len]
+
+                elif data_truncating == "fusion":
+                    mel = get_mel(audio_data, audio_cfg)
+                    chunk_frames = max_len // audio_cfg['hop_size'] + 1
+                    total_frames = mel.shape[0]
+
+                    if chunk_frames == total_frames:
+                        mel_fusion = torch.stack([mel, mel, mel, mel], dim=0)
+                        sample["mel_fusion"] = mel_fusion
+                        longer = torch.tensor([False])
+                    else:
+                        # Split range into three parts and pick random indices
+                        ranges = np.array_split(
+                            list(range(0, total_frames - chunk_frames + 1)), 3
+                        )
+                        if len(ranges[1]) == 0:
+                            ranges[1] = [0]
+                        if len(ranges[2]) == 0:
+                            ranges[2] = [0]
+
+                        idx_front = np.random.choice(ranges[0])
+                        idx_middle = np.random.choice(ranges[1])
+                        idx_back = np.random.choice(ranges[2])
+
+                        mel_chunk_front = mel[idx_front:idx_front+chunk_frames, :]
+                        mel_chunk_middle = mel[idx_middle:idx_middle+chunk_frames, :]
+                        mel_chunk_back = mel[idx_back:idx_back+chunk_frames, :]
+
+                        try:
+                            mel_shrink = torchvision.transforms.Resize(
+                                size=[chunk_frames, audio_cfg.get('mel_bins', 64)]
+                            )(mel[None])[0]
+                        except Exception as e:
+                            print(f"Error resizing mel: {e}")
+                            mel_shrink = mel[:chunk_frames, :]
+
+                        mel_fusion = torch.stack(
+                            [mel_shrink, mel_chunk_front, mel_chunk_middle, mel_chunk_back],
+                            dim=0
+                        )
+                        sample["mel_fusion"] = mel_fusion
+                        longer = torch.tensor([True])
+
+                    # Crop audio_data as well
+                    overflow = length - max_len
+                    idx = np.random.randint(0, overflow + 1)
+                    audio_data = audio_data[:, idx: idx + max_len]
+
+                else:
+                    raise NotImplementedError(f"data_truncating {data_truncating} not implemented")
+
+            else:
+                # Audio shorter or equal to max_len
+                if length < max_len:
+                    diff = max_len - length
+                    if data_filling == "repeatpad":
+                        n_repeat = max_len // length
+                        audio_data = audio_data.repeat(1, n_repeat)
+                        if audio_data.size(-1) < max_len:
+                            audio_data = F.pad(audio_data, (0, max_len - audio_data.size(-1)), mode="constant", value=0)
+                    elif data_filling == "pad":
+                        audio_data = F.pad(audio_data, (0, diff), mode="constant", value=0)
+                    elif data_filling == "repeat":
+                        n_repeat = max_len // length
+                        audio_data = audio_data.repeat(1, n_repeat+1)[:, :max_len]
+                    else:
+                        raise NotImplementedError(f"data_filling {data_filling} not implemented")
+
+                if data_truncating == 'fusion':
+                    # Just replicate mel 4 times if needed
+                    mel = get_mel(audio_data, audio_cfg)
                     mel_fusion = torch.stack([mel, mel, mel, mel], dim=0)
                     sample["mel_fusion"] = mel_fusion
-                    print("mel_fusion.shape:", mel_fusion.shape)
-                    longer = torch.tensor([False])
-                else:
-                    ranges = np.array_split(list(range(0, total_frames - chunk_frames + 1)), 3)
 
-                    if len(ranges[1]) == 0:
-                        # if the audio is too short, we just use the first chunk
-                        ranges[1] = [0]
-                    if len(ranges[2]) == 0:
-                        # if the audio is too short, we just use the first chunk
-                        ranges[2] = [0]
-                    # randomly choose index for each part
-                    idx_front = np.random.choice(ranges[0])
-                    idx_middle = np.random.choice(ranges[1])
-                    idx_back = np.random.choice(ranges[2])
-                    # select mel
-                    mel_chunk_front = mel[idx_front:idx_front + chunk_frames, :]
-                    mel_chunk_middle = mel[idx_middle:idx_middle + chunk_frames, :]
-                    mel_chunk_back = mel[idx_back:idx_back + chunk_frames, :]
+                longer = torch.tensor([False])
 
-                    # shrink the mel
-                    mel_shrink = torchvision.transforms.Resize(size=[chunk_frames, audio_cfg['mel_bins']])(mel[None])[0]
-                    # logging.info(f"mel_shrink.shape: {mel_shrink.shape}")
-
-                    # stack
-                    mel_fusion = torch.stack([mel_shrink, mel_chunk_front, mel_chunk_middle, mel_chunk_back], dim=0)
-                    sample["mel_fusion"] = mel_fusion
-                    print("mel_fusion.shape:", mel_fusion.shape)
-                    longer = torch.tensor([True])
-            else:
-                raise NotImplementedError(
-                    f"data_truncating {data_truncating} not implemented"
-                )
-            # random crop to max_len (for compatibility)
-            overflow = len(audio_data) - max_len
-            idx = np.random.randint(0, overflow + 1)
-            audio_data = audio_data[idx: idx + max_len]
-
-        else:  # padding if too short
-            if len(audio_data) < max_len:  # do nothing if equal
-                if data_filling == "repeatpad":
-                    n_repeat = int(max_len / len(audio_data))
-                    audio_data = audio_data.repeat(n_repeat)
-                    # audio_data = audio_data.unsqueeze(0).unsqueeze(0).unsqueeze(0)
-                    # audio_data = F.interpolate(audio_data,size=max_len,mode="bicubic")[0,0,0]
-                    audio_data = F.pad(
-                        audio_data,
-                        (0, max_len - len(audio_data)),
-                        mode="constant",
-                        value=0,
-                    )
-                elif data_filling == "pad":
-                    audio_data = F.pad(
-                        audio_data,
-                        (0, max_len - len(audio_data)),
-                        mode="constant",
-                        value=0,
-                    )
-                elif data_filling == "repeat":
-                    n_repeat = int(max_len / len(audio_data))
-                    audio_data = audio_data.repeat(n_repeat + 1)[:max_len]
-                else:
-                    raise NotImplementedError(
-                        f"data_filling {data_filling} not implemented"
-                    )
-            if data_truncating == 'fusion':
-                mel = get_mel(audio_data, audio_cfg)
-                mel_fusion = torch.stack([mel, mel, mel, mel], dim=0)
-                sample["mel_fusion"] = mel_fusion
-            longer = torch.tensor([False])
+    except NotImplementedError as nie:
+        print(f"NotImplementedError in get_audio_features: {nie}")
+        longer = torch.tensor([False])
+    except Exception as e:
+        print(f"Error in get_audio_features: {e}")
+        longer = torch.tensor([False])
 
     sample["longer"] = longer
-    sample["waveform"] = audio_data
+    # Keep (1,T) or squeeze if model expects (T,)
+    # If your model expects waveform as (T,), do: audio_data = audio_data.squeeze(0)
+    # If it expects (1,T), leave it as is.
+    # We'll squeeze it here for example:
+    sample["waveform"] = audio_data.squeeze(0)  
     return sample
 
 def read_txt_file(file_path):
@@ -568,60 +611,58 @@ def preprocess(
     sample,
     audio_ext,
     text_ext,
-    melody_ext, # txt
+    melody_ext, 
     max_len,
     audio_cfg,
-    args,  # 将args提前，因为它没有默认值
+    args,
     class_index_dict=None,
     data_filling="pad",
     data_truncating="rand_trunc",
     text_augment_selection=None,
 ):
     """
-    Preprocess a single sample for wdsdataloader.
+    Preprocess a single sample:
+    - Decode audio
+    - Process audio (get_audio_features)
+    - Extract text from JSON
+    - Optionally read melody text
     """
+
+    # Load audio from sample
     audio_data, orig_sr = sf.read(io.BytesIO(sample[audio_ext]))
     audio_data = int16_to_float32(float32_to_int16(audio_data))
     audio_data = torch.tensor(audio_data).float()
 
-    # TODO: (yusong) to be include in the future
-    # # if torchaudio not installed, use soundfile to load audio
-    # if torchaudio is None:
-    #     audio_data, orig_sr = sf.read(io.BytesIO(sample[audio_ext]))
-    #     audio_data = torch.tensor(audio_data).float()
-    # else:
-    #     # https://github.com/webdataset/webdataset/blob/main/webdataset/autodecode.py
-    #     with tempfile.TemporaryDirectory() as dirname:
-    #         os.makedirs(dirname, exist_ok=True)
-    #         fname = os.path.join(dirname, f"file.flac")
-    #         with open(fname, "wb") as stream:
-    #             stream.write(sample[audio_ext])
-    #         audio_data, orig_sr = torchaudio.load(fname)
-    #         audio_data = audio_data[0, :].float()
+    # Ensure audio is (1,T)
+    if audio_data.dim() == 1:
+        audio_data = audio_data.unsqueeze(0)
+    elif audio_data.dim() == 2 and audio_data.size(0) > 1:
+        audio_data = audio_data.mean(dim=0, keepdim=True)
 
+    # Process audio
     sample = get_audio_features(
         sample, audio_data, max_len, data_truncating, data_filling, audio_cfg
     )
     del sample[audio_ext]
 
+    # Parse JSON text
     try:
         json_dict_raw = json.loads(sample[text_ext].decode("utf-8"))
     except:
-        print("sample[__url__]:", sample["__url__"])
+        print("sample[__url__]:", sample.get("__url__", "No URL"))
+        json_dict_raw = {"text": ""}
 
+    # Melody text if melody_path is provided
     if args.melody_path:
         melody_path = os.path.join(args.melody_path, sample["__key__"].split("/")[-1] + ".txt")
         if os.path.exists(melody_path):
-            # melody_data = torch.load(melody_path)
             embeddings = read_txt_file(melody_path)
-            melody_data = embeddings
-            sample["melody_text"] = melody_data
+            sample["melody_text"] = embeddings
             sample["melody_name"] = sample["__key__"].split("/")[-1] + "." + melody_ext
         else:
             print(f"Melody file not found: {melody_path}")
 
-
-    # For selecting augmented text from dataset
+    # Select text field
     if text_augment_selection is None or text_augment_selection == "none":
         texts = json_dict_raw["text"]
     elif text_augment_selection == "all":
@@ -641,26 +682,30 @@ def preprocess(
         raise NotImplementedError(
             f"text_augment_selection {text_augment_selection} not implemented"
         )
+
     sample["full_text"] = texts
 
-    if isinstance(texts, list) and isinstance(texts[0], str) and len(texts) > 1:
+    # If multiple texts, choose one randomly
+    if isinstance(texts, list) and len(texts) > 1 and isinstance(texts[0], str):
         texts = random.choice(texts)
+
     sample["raw_text"] = texts
     sample["text"] = tokenizer(texts)  # text shape: [num_token]
-    if class_index_dict is not None:
-        # https://stackoverflow.com/questions/48004243/how-to-share-large-read-only-dictionary-list-across-processes-in-multiprocessing
-        # https://stackoverflow.com/questions/45693949/storing-strings-in-a-multiprocessing-sharedctypes-array
-        # key, val = class_index_dict
-        # key = key[:].split('\n')
-        # _dict = {k: v for k, v in zip(key, val)}
-        sample["class_label"] = np.zeros(len(class_index_dict.keys()))
+
+    # If class_index_dict is available, create class_label
+    if class_index_dict is not None and "tag" in json_dict_raw:
+        class_label = np.zeros(len(class_index_dict.keys()))
         for x in json_dict_raw["tag"]:
-            sample["class_label"][class_index_dict[x]] = 1
-        sample["class_label"] = torch.tensor(sample["class_label"]).float()
+            if x in class_index_dict:
+                class_label[class_index_dict[x]] = 1
+        sample["class_label"] = torch.tensor(class_label).float()
+
     del sample[text_ext]
+
     sample["audio_name"] = sample["__key__"].split("/")[-1] + "." + audio_ext
     sample["text_name"] = sample["__key__"].split("/")[-1] + "." + text_ext
     sample["audio_orig_sr"] = orig_sr
+
     return sample
 
 

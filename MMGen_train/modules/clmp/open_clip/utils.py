@@ -105,17 +105,20 @@ def get_tar_path_from_dataset_name(
         for s in current_dataset_types:
             tmp = []
             if islocal:
-                sizefilepath_ = f"{dataset_path}/{n}/{s}/sizes.json"
+                sizefilepath_ = f"{dataset_path}/{s}/sizes.json"
+                # sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
                 if not os.path.exists(sizefilepath_):
-                    sizefilepath_ = f"./json_files/{n}/{s}/sizes.json"
+                    sizefilepath_ = f"/root/Awesome-Music-Generation/MusicSet/{s}/sizes.json"
+                    # sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
             else:
-                sizefilepath_ = f"./json_files/{n}/{s}/sizes.json"
+                # sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
+                sizefilepath_ = f"/root/Awesome-Music-Generation/MusicSet/{s}/sizes.json"
             if not os.path.exists(sizefilepath_):
                 continue
             sizes = json.load(open(sizefilepath_, "r"))
             for k in sizes.keys():
                 if islocal:
-                    tmp.append(f"{dataset_path}/{n}/{s}/{k}")
+                    tmp.append(f"{dataset_path}/{s}/{k}")
                 else:
                     tmp.append(
                         f"pipe:aws s3 --cli-connect-timeout 0 cp s3://s-laion-audio/webdataset_tar/{n}/{s}/{k} -"

@@ -879,7 +879,7 @@ def evaluate_clotho_audiocaps(
             # logits_per_text shape: [num_samples*5, num_samples]
 
             logging.info(
-                f"dataset {n}, logits_per_audio shape: {logits_per_audio.shape}, "
+                f"dataset  , logits_per_audio shape: {logits_per_audio.shape}, "
                 f"logits_per_text shape: {logits_per_text.shape}"
             )
 
@@ -976,8 +976,8 @@ def calculate_selection_performance_clotho_audiocaps(val_metrics_per_dataset):
     selection_performance_all = []
     for n in val_metrics_per_dataset.keys():
         selection_performance = (
-            val_metrics_per_dataset[n][f"{n}/audio_to_text_mAP@10"]
-            + val_metrics_per_dataset[n][f"{n}/text_to_audio_mAP@10"]
+            val_metrics_per_dataset[n][f" /audio_to_text_mAP@10"]
+            + val_metrics_per_dataset[n][f" /text_to_audio_mAP@10"]
         ) / 2
         selection_performance_all.append(selection_performance)
     return np.mean(selection_performance_all)

@@ -68,11 +68,11 @@ def save_index(index, index_path):
 
 if __name__ == "__main__":
     # Load data
-    melody_data = np.load('Awesome-Music-Generation/MMGen_train/modules/clmp/faiss_indexing/clmp_embeddings/melody.npy')
+    melody_data = np.load('/root/m2music/clm_data/embeddings/melody_embeddings.npy')
     print("melody_data loaded")
-    audio_data = np.load('Awesome-Music-Generation/MMGen_train/modules/clmp/faiss_indexing/clmp_embeddings/audio.npy')
+    audio_data = np.load('/root/m2music/clm_data/embeddings/audio_embeddings.npy')
     print("audio_data loaded")
-    audio_queries = np.load('Awesome-Music-Generation/MMGen_train/modules/clmp/faiss_indexing/clmp_embeddings/audio.npy')
+    audio_queries = np.load('/root/m2music/clm_data/embeddings/text_embeddings.npy')
     print("audio_queries loaded")
     
     # HNSW parameters
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     print(f"Audio to melody search time: {validation_result['audio_to_melody_search_time']:.6f} seconds")
 
     # Save index
-    save_path = 'Awesome-Music-Generation/MMGen_train/modules/clmp/faiss_indexing/faiss_indices'
+    save_path = '/root/m2music/clm_data/faiss'
 
     melody_index_path = os.path.join(save_path, f'audio_2_melody_{file_suffix}.faiss')
     print("Saving melody HNSW index...")

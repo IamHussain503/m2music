@@ -2,8 +2,12 @@
 # Email: haoheliu@gmail.com
 # Date: 11 Feb 2023
 
+import sys
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 
 import sys
 sys.path.append("src")
@@ -189,7 +193,7 @@ def main(configs, config_yaml_path, exp_group_name, exp_name, perform_validation
         strategy=DDPStrategy(find_unused_parameters=True),
         callbacks=[checkpoint_callback],
     )
-    only_validation = True
+    only_validation = False
     if only_validation:
         trainer.validate(latent_diffusion, val_loader, ckpt_path=resume_from_checkpoint)
     else:

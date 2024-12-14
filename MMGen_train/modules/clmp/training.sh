@@ -59,13 +59,13 @@ CUDA_VISIBLE_DEVICES=0 python -m training.main \
     --data-truncating "rand_trunc" \
     --tmodel roberta \
     --amodel HTSAT-tiny \
-    --pretrained-audio 'path-to-pretrained-audio' \
-    --logs 'path-to-logs' \
+    --pretrained-audio '/root/m2music/MMGen_train/modules/clmp/HTSAT-fullset-imagenet-tiny-map=0.467.ckpt' \
+    --logs '/root/m2music/logs' \
     --datasetinfos "train" \
-    --datasetnames "your-dataset-name" \
-    --datasetpath='path-to-dataset' \
-    --melody-path='path-to-melody' \
+    --datasetnames "zain" \
+    --datasetpath='/root/Awesome-Music-Generation/MusicSet' \
+    --melody-path='/root/Awesome-Music-Generation/MelodySet/shutil_melody_text_all' \
     --top-k-checkpoint-select-dataset="<datasetnames>-test" \
     --batch-size=32 \
     --epochs=60 \
-    # --collect-audio-melody-feature True
+    --collect-audio-melody-feature True
