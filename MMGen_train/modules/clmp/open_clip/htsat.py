@@ -1147,10 +1147,10 @@ class HTSAT_Swin_Transformer(nn.Module):
             # Reshape fallback tensor to (batch_size, 1, samples)
             if x.dim() == 3:  # Shape: [batch_size, time, freq]
                 batch_size, time, freq = x.shape
-                x = x.view(batch_size, 1, -1)  # Flatten time and freq into samples
+                x = x.reshape(batch_size, 1, -1)  # Flatten time and freq into samples
             elif x.dim() == 2:  # Shape: [time, freq]
                 x = x.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
-                x = x.view(1, 1, -1)  # Flatten into (1, 1, samples)
+                x = x.reshape(1, 1, -1)  # Flatten into (1, 1, samples)
 
             print(f"Shape of fallback x (waveform): {x.shape}")
 
@@ -1216,6 +1216,7 @@ class HTSAT_Swin_Transformer(nn.Module):
             "fine_grained_embedding": latent_output,
         }
         return output_dict
+
 
 
 
