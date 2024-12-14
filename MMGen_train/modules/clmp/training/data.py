@@ -281,57 +281,148 @@ def preprocess_txt(text):
     return tokenize([str(text)])[0]
 
 
+# def get_dataset_size(shards, sizefilepath_=None, is_local=True):
+#     try:
+#         if isinstance(shards, list):
+#             size_list = []
+#             for s in shards:
+#                 try:
+#                     size_list.append(
+#                         get_dataset_size(s, sizefilepath_=sizefilepath_, is_local=is_local)[0]
+#                     )
+#                 except Exception as e:
+#                     print(f"Error processing shard {s}: {e}")
+#                     raise
+#         else:
+#             if not is_local:
+#                 try:
+#                     for n in dataset_split.keys():
+#                         if n in shards.split("/"):
+#                             break
+#                     for s in dataset_split[n]:
+#                         if s in shards.split("/"):
+#                             break
+#                     sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
+#                 except KeyError as e:
+#                     print(f"KeyError: {e} - Invalid dataset split structure for {shards}")
+#                     raise
+#             shards_list = list(braceexpand.braceexpand(shards))
+#             dir_path = os.path.dirname(shards)
+#             if sizefilepath_ is not None:
+#                 try:
+#                     sizes = json.load(open(sizefilepath_, "r"))
+#                     total_size = sum(
+#                         [
+#                             int(sizes[os.path.basename(shard.replace(".tar -", ".tar"))])
+#                             for shard in shards_list
+#                         ]
+#                     )
+#                 except FileNotFoundError as e:
+#                     print(f"FileNotFoundError: {e} - Could not find sizes.json at {sizefilepath_}")
+#                     raise
+#                 except KeyError as e:
+#                     print(f"KeyError: {e} - Missing entry in sizes.json for some shards")
+#                     raise
+#             else:
+#                 sizes_filename = os.path.join(dir_path, "sizes.json")
+#                 len_filename = os.path.join(dir_path, "__len__")
+#                 if os.path.exists(sizes_filename):
+#                     try:
+#                         sizes = json.load(open(sizes_filename, "r"))
+#                         total_size = sum(
+#                             [int(sizes[os.path.basename(shard)]) for shard in shards_list]
+#                         )
+#                     except KeyError as e:
+#                         print(f"KeyError: {e} - Missing entry in sizes.json for some shards")
+#                         raise
+#                 elif os.path.exists(len_filename):
+#                     try:
+#                         total_size = ast.literal_eval(open(len_filename, "r").read())
+#                     except SyntaxError as e:
+#                         print(f"SyntaxError: {e} - Error evaluating __len__ file")
+#                         raise
+#                 else:
+#                     raise Exception(
+#                         f"Cannot find sizes file or __len__ file in directory: {dir_path}"
+#                     )
+#         num_shards = len(shards_list)
+
+#         if isinstance(shards, list):
+#             return sum(size_list), len(shards)
+#         else:
+#             return total_size, num_shards
+
+#     except Exception as e:
+#         print(f"Exception encountered in get_dataset_size: {e}")
+#         raise
+
 def get_dataset_size(shards, sizefilepath_=None, is_local=True):
-    if isinstance(shards, list):
-        size_list = []
-        for s in shards:
-            size_list.append(
-                get_dataset_size(s, sizefilepath_=sizefilepath_, is_local=is_local)[0]
-            )
-    else:
-        if not is_local:
-            for n in dataset_split.keys():
-                if n in shards.split("/"):
-                    break
-            for s in dataset_split[n]:
-                if s in shards.split("/"):
-                    break
-            sizefilepath_ = f"./json_files/{n}/{s}/sizes.json"
-        shards_list = list(braceexpand.braceexpand(shards))
-        dir_path = os.path.dirname(shards)
-        if sizefilepath_ is not None:
-            sizes = json.load(open(sizefilepath_, "r"))
-            total_size = sum(
-                [
-                    int(sizes[os.path.basename(shard.replace(".tar -", ".tar"))])
-                    for shard in shards_list
-                ]
-            )
+    try:
+        if isinstance(shards, list):
+            size_list = []
+            for s in shards:
+                try:
+                    size_list.append(
+                        get_dataset_size(s, sizefilepath_=sizefilepath_, is_local=is_local)[0]
+                    )
+                except Exception as e:
+                    print(f"Error processing shard {s}: {e}")
+                    raise
+            return sum(size_list), len(shards)
         else:
-            sizes_filename = os.path.join(dir_path, "sizes.json")
-            len_filename = os.path.join(dir_path, "__len__")
-            if os.path.exists(sizes_filename):
-                sizes = json.load(open(sizes_filename, "r"))
-                total_size = sum(
-                    [int(sizes[os.path.basename(shard)]) for shard in shards_list]
-                )
-            elif os.path.exists(len_filename):
-                # FIXME this used to be eval(open(...)) but that seemed rather unsafe
-                total_size = ast.literal_eval(open(len_filename, "r").read())
-            else:
-                raise Exception(
-                    "Cannot find sizes file for dataset. Please specify the path to the file."
-                )
-                # total_size = None  # num samples undefined
-                # some common dataset sizes (at time of authors last download)
-                # cc3m-train: 2905954
-                # cc12m: 10968539
-                # LAION-400m: 407332084
-        num_shards = len(shards_list)
-    if isinstance(shards, list):
-        return sum(size_list), len(shards)
-    else:
-        return total_size, num_shards
+            if not is_local:
+                try:
+                    for n in dataset_split.keys():
+                        if n in shards.split("/"):
+                            break
+                    for s in dataset_split[n]:
+                        if s in shards.split("/"):
+                            break
+                    # sizefilepath_ = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
+                    sizefilepath_ = f"/root/Awesome-Music-Generation/MusicSet/{n}/{s}/sizes.json"
+                except KeyError as e:
+                    print(f"KeyError: {e} - Invalid dataset split structure for {shards}")
+                    raise
+            
+            shards_list = None  # Initialize shards_list to avoid UnboundLocalError
+            try:
+                shards_list = list(braceexpand.braceexpand(shards))
+                dir_path = os.path.dirname(shards)
+                if sizefilepath_ is not None:
+                    sizes = json.load(open(sizefilepath_, "r"))
+                    total_size = sum(
+                        [
+                            int(sizes[os.path.basename(shard.replace(".tar -", ".tar"))])
+                            for shard in shards_list
+                        ]
+                    )
+                else:
+                    sizes_filename = os.path.join(dir_path, "sizes.json")
+                    len_filename = os.path.join(dir_path, "__len__")
+                    if os.path.exists(sizes_filename):
+                        sizes = json.load(open(sizes_filename, "r"))
+                        total_size = sum(
+                            [int(sizes[os.path.basename(shard)]) for shard in shards_list]
+                        )
+                    elif os.path.exists(len_filename):
+                        total_size = ast.literal_eval(open(len_filename, "r").read())
+                    else:
+                        raise Exception(
+                            f"Cannot find sizes file or __len__ file in directory: {dir_path}"
+                        )
+                num_shards = len(shards_list)
+                return total_size, num_shards
+
+            except Exception as e:
+                print(f"Exception in shard processing: {e}")
+                if shards_list is None:
+                    print("Error: shards_list could not be initialized. Check input paths.")
+                raise
+
+    except Exception as e:
+        print(f"Exception encountered in get_dataset_size: {e}")
+        raise
+
 
 
 def get_imagenet(args, preprocess_fns, split):
@@ -755,9 +846,11 @@ def get_wds_dataset(
     assert input_shards is not None
 
     if not sizefilepath_ is None:
-        sizefilepath = sizefilepath_
+        sizefilepath = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
+        # sizefilepath = sizefilepath_
     else:
-        sizefilepath = os.path.join(os.path.dirname(input_shards[0]), "sizes.json")
+        # sizefilepath = os.path.join(os.path.dirname(input_shards[0]), "sizes.json")
+        sizefilepath = "/root/Awesome-Music-Generation/MusicSet/train/sizes.json"
 
     if proportion != 1.0:
         num_samples, num_shards, input_shards, _ = sample_prop(
@@ -977,73 +1070,161 @@ def get_toy_dataset(args, model_cfg, is_train):
     return DataInfo(dataloader, sampler)
 
 
+# def get_dataset_fn(data_path, dataset_type):
+#     if dataset_type == "webdataset":
+#         return get_wds_dataset
+#     elif dataset_type == "csv":
+#         return get_csv_dataset
+#     elif dataset_type == "auto":
+#         ext = data_path.split(".")[-1]
+#         if ext in ["csv", "tsv"]:
+#             return get_csv_dataset
+#         elif ext in ["tar"]:
+#             return get_wds_dataset
+#         else:
+#             raise ValueError(
+#                 f"Tried to figure out dataset type, but failed for extention {ext}."
+#             )
+#     elif dataset_type == "toy":
+#         return get_toy_dataset
+#     else:
+#         raise ValueError(f"Unsupported dataset type: {dataset_type}")
+
 def get_dataset_fn(data_path, dataset_type):
-    if dataset_type == "webdataset":
-        return get_wds_dataset
-    elif dataset_type == "csv":
-        return get_csv_dataset
-    elif dataset_type == "auto":
-        ext = data_path.split(".")[-1]
-        if ext in ["csv", "tsv"]:
-            return get_csv_dataset
-        elif ext in ["tar"]:
+    try:
+        print(f"get_dataset_fn called with:")
+        print(f"  data_path: {data_path}")
+        print(f"  dataset_type: {dataset_type}")
+
+        if dataset_type == "webdataset":
+            print("Returning get_wds_dataset function for dataset_type: webdataset")
             return get_wds_dataset
+        elif dataset_type == "csv":
+            print("Returning get_csv_dataset function for dataset_type: csv")
+            return get_csv_dataset
+        elif dataset_type == "auto":
+            try:
+                ext = data_path.split(".")[-1]
+                print(f"Determined file extension: {ext}")
+                if ext in ["csv", "tsv"]:
+                    print("Returning get_csv_dataset function for file extension: csv/tsv")
+                    return get_csv_dataset
+                elif ext in ["tar"]:
+                    print("Returning get_wds_dataset function for file extension: tar")
+                    return get_wds_dataset
+                else:
+                    raise ValueError(
+                        f"Tried to figure out dataset type, but failed for extension {ext}."
+                    )
+            except Exception as e:
+                print(f"Error processing dataset_type: auto, data_path: {data_path}")
+                print(f"Exception: {e}")
+                raise
+        elif dataset_type == "toy":
+            print("Returning get_toy_dataset function for dataset_type: toy")
+            return get_toy_dataset
         else:
-            raise ValueError(
-                f"Tried to figure out dataset type, but failed for extention {ext}."
-            )
-    elif dataset_type == "toy":
-        return get_toy_dataset
-    else:
-        raise ValueError(f"Unsupported dataset type: {dataset_type}")
+            raise ValueError(f"Unsupported dataset type: {dataset_type}")
+    except ValueError as ve:
+        print(f"ValueError: {ve}")
+        raise
+    except Exception as e:
+        print(f"Unhandled exception in get_dataset_fn: {e}")
+        raise
+
 
 
 def get_data(args, model_cfg):
     data = {}
+    try:
 
-    args.class_index_dict = load_class_label(args.class_label_path)
+        # Load class labels
+        try:
+            args.class_index_dict = load_class_label(args.class_label_path)
+            print("Class labels loaded successfully.")
+        except Exception as e:
+            print(f"Error loading class labels from {args.class_label_path}: {e}")
+            raise
 
-    if args.datasetinfos is None:
-        args.datasetinfos = ["train", "unbalanced_train", "balanced_train"]
-    if args.dataset_type == "webdataset":
-        args.train_data = get_tar_path_from_dataset_name(
-            args.datasetnames,
-            args.datasetinfos,
-            islocal=not args.remotedata,
-            proportion=args.dataset_proportion,
-            dataset_path=args.datasetpath,
-            full_dataset=args.full_train_dataset,
-        )
+        # Default dataset information
+        if args.datasetinfos is None:
+            args.datasetinfos = ["train", "unbalanced_train", "balanced_train"]
+        print(f"Datasetinfos set to: {args.datasetinfos}")
 
-        if args.full_train_dataset is None:
-            args.full_train_dataset = []
-        if args.exclude_eval_dataset is None:
-            args.exclude_eval_dataset = []
-        excluded_eval_datasets = args.full_train_dataset + args.exclude_eval_dataset
+        # Handle webdataset-specific data paths
+        if args.dataset_type == "webdataset":
+            try:
+                args.train_data = get_tar_path_from_dataset_name(
+                    args.datasetnames,
+                    args.datasetinfos,
+                    islocal=not args.remotedata,
+                    proportion=args.dataset_proportion,
+                    dataset_path=args.datasetpath,
+                    full_dataset=args.full_train_dataset,
+                )
+                print("Train data paths resolved successfully.")
+            except Exception as e:
+                print(f"Error resolving train data paths: {e}")
+                raise
 
-        val_dataset_names = (
-            [n for n in args.datasetnames if n not in excluded_eval_datasets]
-            if excluded_eval_datasets
-            else args.datasetnames
-        )
-        args.val_dataset_names = val_dataset_names
-        args.val_data = get_tar_path_from_dataset_name(
-            val_dataset_names,
-            ["valid", "test", "eval"],
-            islocal=not args.remotedata,
-            proportion=1,
-            dataset_path=args.datasetpath,
-            full_dataset=None,
-        )
+            # Handle excluded datasets
+            if args.full_train_dataset is None:
+                args.full_train_dataset = []
+            if args.exclude_eval_dataset is None:
+                args.exclude_eval_dataset = []
+            excluded_eval_datasets = args.full_train_dataset + args.exclude_eval_dataset
 
-    if args.train_data:
-        data["train"] = get_dataset_fn(args.train_data, args.dataset_type)(
-            args, model_cfg, is_train=True
-        )
+            try:
+                val_dataset_names = (
+                    [n for n in args.datasetnames if n not in excluded_eval_datasets]
+                    if excluded_eval_datasets
+                    else args.datasetnames
+                )
+                args.val_dataset_names = val_dataset_names
+                print(f"Validation dataset names resolved: {val_dataset_names}")
+            except Exception as e:
+                print(f"Error resolving validation dataset names: {e}")
+                raise
 
-    if args.val_data:
-        data["val"] = get_dataset_fn(args.val_data, args.dataset_type)(
-            args, model_cfg, is_train=False
-        )
+            try:
+                args.val_data = get_tar_path_from_dataset_name(
+                    val_dataset_names,
+                    ["valid", "test", "eval"],
+                    islocal=not args.remotedata,
+                    proportion=1,
+                    dataset_path=args.datasetpath,
+                    full_dataset=None,
+                )
+                print("Validation data paths resolved successfully.")
+            except Exception as e:
+                print(f"Error resolving validation data paths: {e}")
+                raise
+
+        # Get train dataset
+        if args.train_data:
+            try:
+                data["train"] = get_dataset_fn(args.train_data, args.dataset_type)(
+                    args, model_cfg, is_train=True
+                )
+                print("Train dataset loaded successfully.")
+            except Exception as e:
+                print(f"Error loading train dataset: {e}")
+                raise
+
+        # Get validation dataset
+        if args.val_data:
+            try:
+                data["valid"] = get_dataset_fn(args.val_data, args.dataset_type)(
+                    args, model_cfg, is_train=False
+                )
+                print("Validation dataset loaded successfully.")
+            except Exception as e:
+                print(f"Error loading validation dataset: {e}")
+                raise
+
+    except Exception as e:
+        print(f"Exception in get_data: {e}")
+        raise
 
     return data
+
