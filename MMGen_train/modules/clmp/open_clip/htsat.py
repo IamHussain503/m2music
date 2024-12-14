@@ -1123,141 +1123,90 @@ class HTSAT_Swin_Transformer(nn.Module):
         x = x.repeat(repeats=(1, 1, 4, 1))
         return x
 
-    def forward(
-        self, x: torch.Tensor, mixup_lambda=None, infer_mode=False, device=None
-    ):  # out_feat_keys: List[str] = None):
-        if self.enable_fusion and x["longer"].sum() == 0:
-            # if no audio is longer than 10s, then randomly select one audio to be longer
-            x["longer"][torch.randint(0, x["longer"].shape[0], (1,))] = True
+    def forward(self, x, *args, **kwargs):
+        """
+        Forward method for the HTSAT model.
 
-            if not self.enable_fusion:
-                x = x["waveform"].to(device=device, non_blocking=True)
-            if x.dim() == 1:
-                    x = x.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
-            elif x.dim() == 2:
-                    x = x.unsqueeze(1)  # Add channel dimension
-            print(f"Keys in x:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: {x.keys()}")
-            x = self.spectrogram_extractor(x)  # (batch_size, 1, time_steps, freq_bins)
-            x = self.logmel_extractor(x)  # (batch_size, 1, time_steps, mel_bins)
-            x = x.transpose(1, 3)
-            x = self.bn0(x)
-            x = x.transpose(1, 3)
-            if self.training:
-                x = self.spec_augmenter(x)
+        Handles both 'mel_fusion' and 'waveform' input types, adjusts dimensions as needed, and ensures compatibility with further processing.
+        """
+        # Debugging: Check input type and keys
+        if not isinstance(x, dict):
+            raise TypeError(f"Expected 'x' to be a dictionary but got type {type(x)}.")
+        print(f"Keys in input x: {x.keys()}")
 
-            if self.training and mixup_lambda is not None:
-                x = do_mixup(x, mixup_lambda)
-
-            x = self.reshape_wav2img(x)
-            output_dict = self.forward_features(x)
+        # Handle 'mel_fusion' or fallback to 'waveform'
+        if "mel_fusion" in x:
+            print("Using mel_fusion input.")
+            x = x["mel_fusion"].to(device=device, non_blocking=True)
         else:
-            print(f"Keys in x::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::wwwww {x.keys()}")
-            longer_list = x["longer"].to(device=device, non_blocking=True)
-            if "mel_fusion" in x:
-                x = x["mel_fusion"].to(device=device, non_blocking=True)
-            else:
-                # Handle the absence of 'mel_fusion' (e.g., fallback to a default tensor)
-                print("Using default fallback for mel_fusion")
-                x = x["waveform"].to(device=device, non_blocking=True)  # Example fallback
+            print("Using default fallback for mel_fusion.")
+            x = x["waveform"].to(device=device, non_blocking=True)
 
-            x = x.transpose(1, 3)
-            x = self.bn0(x)
-            x = x.transpose(1, 3)
-            longer_list_idx = torch.where(longer_list)[0]
-            if self.fusion_type in ["daf_1d", "aff_1d", "iaff_1d"]:
-                new_x = x[:, 0:1, :, :].clone().contiguous()
-                if len(longer_list_idx) > 0:
-                    # local processing
-                    fusion_x_local = x[longer_list_idx, 1:, :, :].clone().contiguous()
-                    FB, FC, FT, FF = fusion_x_local.size()
-                    fusion_x_local = fusion_x_local.view(FB * FC, FT, FF)
-                    fusion_x_local = torch.permute(
-                        fusion_x_local, (0, 2, 1)
-                    ).contiguous()
-                    fusion_x_local = self.mel_conv1d(fusion_x_local)
-                    fusion_x_local = fusion_x_local.view(
-                        FB, FC, FF, fusion_x_local.size(-1)
-                    )
-                    fusion_x_local = (
-                        torch.permute(fusion_x_local, (0, 2, 1, 3))
-                        .contiguous()
-                        .flatten(2)
-                    )
-                    if fusion_x_local.size(-1) < FT:
-                        fusion_x_local = torch.cat(
-                            [
-                                fusion_x_local,
-                                torch.zeros(
-                                    (FB, FF, FT - fusion_x_local.size(-1)),
-                                    device=device,
-                                ),
-                            ],
-                            dim=-1,
-                        )
-                    else:
-                        fusion_x_local = fusion_x_local[:, :, :FT]
-                    # 1D fusion
-                    new_x = new_x.squeeze(1).permute((0, 2, 1)).contiguous()
-                    new_x[longer_list_idx] = self.fusion_model(
-                        new_x[longer_list_idx], fusion_x_local
-                    )
-                    x = new_x.permute((0, 2, 1)).contiguous()[:, None, :, :]
-                else:
-                    x = new_x
+            # Ensure x has at least 4 dimensions (batch, channel, time, freq)
+            while x.dim() < 4:
+                x = x.unsqueeze(0)  # Add batch, channel, or time dimensions
+            print(f"Shape of fallback x (waveform): {x.shape}")
 
-            elif self.fusion_type in ["daf_2d", "aff_2d", "iaff_2d", "channel_map"]:
-                x = x  # no change
+        # Validate and transpose dimensions
+        if x.dim() >= 4:
+            x = x.transpose(1, 3)  # Ensure correct shape for spectrogram extractor
+            print(f"Shape after transpose: {x.shape}")
+        else:
+            raise ValueError(f"Unexpected shape for x: {x.shape}, expected at least 4 dimensions.")
 
-            if self.training:
-                x = self.spec_augmenter(x)
-            if self.training and mixup_lambda is not None:
-                x = do_mixup(x, mixup_lambda)
+        # Spectrogram extraction
+        x = self.spectrogram_extractor(x)  # (batch_size, 1, time_steps, freq_bins)
+        x = self.logmel_extractor(x)       # (batch_size, 1, time_steps, mel_bins)
+        x = x.transpose(1, 3)              # Transpose back to the expected shape
+        x = self.bn0(x)
+        x = x.transpose(1, 3)
 
-            x = self.reshape_wav2img(x)
-            output_dict = self.forward_features(x, longer_idx=longer_list_idx)
+        # Apply SpecAugmentation during training
+        if self.training:
+            x = self.spec_augmenter(x)
 
-        # if infer_mode:
-        #     # in infer mode. we need to handle different length audio input
-        #     frame_num = x.shape[2]
-        #     target_T = int(self.spec_size * self.freq_ratio)
-        #     repeat_ratio = math.floor(target_T / frame_num)
-        #     x = x.repeat(repeats=(1,1,repeat_ratio,1))
-        #     x = self.reshape_wav2img(x)
-        #     output_dict = self.forward_features(x)
-        # else:
-        #     if x.shape[2] > self.freq_ratio * self.spec_size:
-        #         if self.training:
-        #             x = self.crop_wav(x, crop_size=self.freq_ratio * self.spec_size)
-        #             x = self.reshape_wav2img(x)
-        #             output_dict = self.forward_features(x)
-        #         else:
-        #             # Change: Hard code here
-        #             overlap_size = (x.shape[2] - 1) // 4
-        #             output_dicts = []
-        #             crop_size = (x.shape[2] - 1) // 2
-        #             for cur_pos in range(0, x.shape[2] - crop_size - 1, overlap_size):
-        #                 tx = self.crop_wav(x, crop_size = crop_size, spe_pos = cur_pos)
-        #                 tx = self.reshape_wav2img(tx)
-        #                 output_dicts.append(self.forward_features(tx))
-        #             clipwise_output = torch.zeros_like(output_dicts[0]["clipwise_output"]).float().to(x.device)
-        #             framewise_output = torch.zeros_like(output_dicts[0]["framewise_output"]).float().to(x.device)
-        #             for d in output_dicts:
-        #                 clipwise_output += d["clipwise_output"]
-        #                 framewise_output += d["framewise_output"]
-        #             clipwise_output  = clipwise_output / len(output_dicts)
-        #             framewise_output = framewise_output / len(output_dicts)
-        #             output_dict = {
-        #                 'framewise_output': framewise_output,
-        #                 'clipwise_output': clipwise_output
-        #             }
-        #     else: # this part is typically used, and most easy one
-        #         x = self.reshape_wav2img(x)
-        #         output_dict = self.forward_features(x)
-        # x = self.head(x)
+        # LogMel Spectrogram-based Convolution Blocks
+        x = self.conv_block1(x, pool_size=(2, 2), pool_type="avg")
+        x = F.dropout(x, p=0.2, training=self.training)
+        x = self.conv_block2(x, pool_size=(2, 2), pool_type="avg")
+        x = F.dropout(x, p=0.2, training=self.training)
+        x = self.conv_block3(x, pool_size=(2, 2), pool_type="avg")
+        x = F.dropout(x, p=0.2, training=self.training)
+        x = self.conv_block4(x, pool_size=(2, 2), pool_type="avg")
+        x = F.dropout(x, p=0.2, training=self.training)
+        x = self.conv_block5(x, pool_size=(2, 2), pool_type="avg")
+        x = F.dropout(x, p=0.2, training=self.training)
+        x = self.conv_block6(x, pool_size=(1, 1), pool_type="avg")
+        x = F.dropout(x, p=0.2, training=self.training)
 
-        # We process the data in the dataloader part, in that here we only consider the input_T < fixed_T
+        # Average pooling over time
+        x = torch.mean(x, dim=3)
 
+        # Latent feature extraction
+        latent_x1 = F.max_pool1d(x, kernel_size=3, stride=1, padding=1)
+        latent_x2 = F.avg_pool1d(x, kernel_size=3, stride=1, padding=1)
+        latent_x = latent_x1 + latent_x2
+        latent_x = latent_x.transpose(1, 2)
+        latent_x = F.relu_(self.fc1(latent_x))
+        latent_output = interpolate(latent_x, 32)
+
+        # Final embedding and output
+        x1, _ = torch.max(x, dim=2)
+        x2 = torch.mean(x, dim=2)
+        x = x1 + x2
+        x = F.dropout(x, p=0.5, training=self.training)
+        x = F.relu_(self.fc1(x))
+        embedding = F.dropout(x, p=0.5, training=self.training)
+        clipwise_output = torch.sigmoid(self.fc_audioset(x))
+
+        # Return the model outputs
+        output_dict = {
+            "clipwise_output": clipwise_output,
+            "embedding": embedding,
+            "fine_grained_embedding": latent_output,
+        }
         return output_dict
+
 
 
 def create_htsat_model(audio_cfg, enable_fusion=False, fusion_type="None"):
