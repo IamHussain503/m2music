@@ -1130,8 +1130,12 @@ class HTSAT_Swin_Transformer(nn.Module):
             # if no audio is longer than 10s, then randomly select one audio to be longer
             x["longer"][torch.randint(0, x["longer"].shape[0], (1,))] = True
 
-        if not self.enable_fusion:
-            x = x["waveform"].to(device=device, non_blocking=True)
+            if not self.enable_fusion:
+                x = x["waveform"].to(device=device, non_blocking=True)
+            if x.dim() == 1:
+                    x = x.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
+            elif x.dim() == 2:
+                    x = x.unsqueeze(1)  # Add channel dimension
             x = self.spectrogram_extractor(x)  # (batch_size, 1, time_steps, freq_bins)
             x = self.logmel_extractor(x)  # (batch_size, 1, time_steps, mel_bins)
             x = x.transpose(1, 3)
