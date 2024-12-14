@@ -722,7 +722,8 @@ class CLAP(nn.Module):
 
         # Add a projection layer for compatibility with audio_projection
         if audio_features.shape[-1] == 512:  # Check if projection is needed
-            audio_features = nn.Linear(512, 1024).to(device)(audio_features)
+            projection_layer = nn.Linear(512, 1024).to(device)  # Define the projection layer
+            audio_features = projection_layer(audio_features)  # Apply projection
 
         # Normalize and project audio features
         audio_embeds = self.audio_projection(audio_features)
