@@ -1126,10 +1126,9 @@ class HTSAT_Swin_Transformer(nn.Module):
     def forward(self, x, *args, **kwargs):
         """
         Forward method for the HTSAT model.
-
-        Handles both 'mel_fusion' and 'waveform' input types, adjusts dimensions as needed, and ensures compatibility with further processing.
+        Handles 'mel_fusion' and 'waveform' input types and ensures compatibility with further processing.
         """
-        # Get the device dynamically or use a passed device argument
+        # Determine the device dynamically
         device = kwargs.get("device", next(self.parameters()).device)
 
         # Debugging: Check input type and keys
@@ -1145,22 +1144,28 @@ class HTSAT_Swin_Transformer(nn.Module):
             print("Using default fallback for mel_fusion.")
             x = x["waveform"].to(device=device, non_blocking=True)
 
-            # Ensure x has at least 4 dimensions (batch, channel, time, freq)
-            while x.dim() < 4:
-                x = x.unsqueeze(0)  # Add batch, channel, or time dimensions
+            # Ensure x has the correct dimensions: (batch_size, 1, samples)
+            if x.dim() == 2:  # Add batch and channel dimensions if missing
+                x = x.unsqueeze(1).unsqueeze(0)  # (samples) -> (1, 1, samples)
+            elif x.dim() == 3:  # Add channel dimension
+                x = x.unsqueeze(1)  # (batch_size, samples) -> (batch_size, 1, samples)
+
             print(f"Shape of fallback x (waveform): {x.shape}")
 
-        # Validate and transpose dimensions
-        if x.dim() >= 4:
-            x = x.transpose(1, 3)  # Ensure correct shape for spectrogram extractor
-            print(f"Shape after transpose: {x.shape}")
-        else:
-            raise ValueError(f"Unexpected shape for x: {x.shape}, expected at least 4 dimensions.")
+        # Validate dimensions before spectrogram extraction
+        if x.dim() != 3:
+            raise ValueError(f"Expected 3D input tensor but got shape: {x.shape}")
 
         # Spectrogram extraction
         x = self.spectrogram_extractor(x)  # (batch_size, 1, time_steps, freq_bins)
-        x = self.logmel_extractor(x)       # (batch_size, 1, time_steps, mel_bins)
-        x = x.transpose(1, 3)              # Transpose back to the expected shape
+        print(f"Shape after spectrogram extraction: {x.shape}")
+
+        # Logmel feature extraction
+        x = self.logmel_extractor(x)  # (batch_size, 1, time_steps, mel_bins)
+        print(f"Shape after logmel extraction: {x.shape}")
+
+        # Further processing
+        x = x.transpose(1, 3)
         x = self.bn0(x)
         x = x.transpose(1, 3)
 
@@ -1168,7 +1173,7 @@ class HTSAT_Swin_Transformer(nn.Module):
         if self.training:
             x = self.spec_augmenter(x)
 
-        # LogMel Spectrogram-based Convolution Blocks
+        # Convolutional blocks
         x = self.conv_block1(x, pool_size=(2, 2), pool_type="avg")
         x = F.dropout(x, p=0.2, training=self.training)
         x = self.conv_block2(x, pool_size=(2, 2), pool_type="avg")
@@ -1182,10 +1187,10 @@ class HTSAT_Swin_Transformer(nn.Module):
         x = self.conv_block6(x, pool_size=(1, 1), pool_type="avg")
         x = F.dropout(x, p=0.2, training=self.training)
 
-        # Average pooling over time
+        # Pooling
         x = torch.mean(x, dim=3)
 
-        # Latent feature extraction
+        # Latent features
         latent_x1 = F.max_pool1d(x, kernel_size=3, stride=1, padding=1)
         latent_x2 = F.avg_pool1d(x, kernel_size=3, stride=1, padding=1)
         latent_x = latent_x1 + latent_x2
@@ -1193,7 +1198,7 @@ class HTSAT_Swin_Transformer(nn.Module):
         latent_x = F.relu_(self.fc1(latent_x))
         latent_output = interpolate(latent_x, 32)
 
-        # Final embedding and output
+        # Final output
         x1, _ = torch.max(x, dim=2)
         x2 = torch.mean(x, dim=2)
         x = x1 + x2
@@ -1209,6 +1214,7 @@ class HTSAT_Swin_Transformer(nn.Module):
             "fine_grained_embedding": latent_output,
         }
         return output_dict
+
 
 
 
