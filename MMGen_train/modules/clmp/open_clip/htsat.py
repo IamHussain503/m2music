@@ -1145,10 +1145,11 @@ class HTSAT_Swin_Transformer(nn.Module):
             x = x["waveform"].to(device=device, non_blocking=True)
 
             # Ensure x has the correct dimensions: (batch_size, 1, samples)
-            if x.dim() == 2:  # Add batch and channel dimensions if missing
-                x = x.unsqueeze(1).unsqueeze(0)  # (samples) -> (1, 1, samples)
-            elif x.dim() == 3:  # Add channel dimension
-                x = x.unsqueeze(1)  # (batch_size, samples) -> (batch_size, 1, samples)
+            if x.dim() == 4:  # Convert from (batch_size, channels, time, freq) to (batch_size, 1, samples)
+                batch_size, channels, time, freq = x.shape
+                x = x.view(batch_size, 1, -1)  # Flatten time and frequency
+            elif x.dim() == 3:  # Already in correct format
+                x = x.unsqueeze(1)  # Add channel dimension (batch_size, samples) -> (batch_size, 1, samples)
 
             print(f"Shape of fallback x (waveform): {x.shape}")
 
@@ -1214,6 +1215,7 @@ class HTSAT_Swin_Transformer(nn.Module):
             "fine_grained_embedding": latent_output,
         }
         return output_dict
+
 
 
 
