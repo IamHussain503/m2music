@@ -1144,9 +1144,10 @@ class HTSAT_Swin_Transformer(nn.Module):
             print("Using default fallback for mel_fusion.")
             x = x["waveform"].to(device=device, non_blocking=True)
 
-            # Reshape fallback tensor to (batch_size, samples)
-            if x.dim() == 3:  # Shape: [batch_size, 1, samples]
-                x = x.squeeze(1)  # Remove the channel dimension
+            # Ensure waveform is reshaped to (batch_size, samples)
+            if x.dim() == 3:  # Shape: [batch_size, time, freq]
+                batch_size, time, freq = x.shape
+                x = x.reshape(batch_size, -1)  # Flatten time and freq into samples
             elif x.dim() == 2:  # Already in [batch_size, samples]
                 pass
             else:
@@ -1155,8 +1156,15 @@ class HTSAT_Swin_Transformer(nn.Module):
             # Normalize waveform (e.g., to [-1, 1])
             x = x / x.abs().max(dim=1, keepdim=True)[0]
 
+            # Ensure tensor is contiguous
+            x = x.contiguous()
+
             print(f"Shape of fallback x (waveform): {x.shape}")
             print(f"Tensor content (sample): {x[:, :10]}")  # Print sample values for debugging
+
+        # Validate dimensions before spectrogram extraction
+        if x.dim() != 2:
+            raise ValueError(f"Expected 2D input tensor for spectrogram extraction but got shape: {x.shape}")
 
         # Spectrogram extraction
         x = self.spectrogram_extractor(x)  # (batch_size, time_steps, freq_bins)
@@ -1216,6 +1224,7 @@ class HTSAT_Swin_Transformer(nn.Module):
             "fine_grained_embedding": latent_output,
         }
         return output_dict
+
 
 
 
