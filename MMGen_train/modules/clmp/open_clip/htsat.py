@@ -1174,6 +1174,10 @@ class HTSAT_Swin_Transformer(nn.Module):
         x = self.logmel_extractor(x.unsqueeze(1))  # Add channel dimension for logmel
         print(f"Shape after logmel extraction: {x.shape}")
 
+        # Squeeze unnecessary dimension to match BatchNorm2d expectations
+        x = x.squeeze(2)
+        print(f"Shape after squeeze: {x.shape}")
+
         # Further processing
         x = x.transpose(1, 3)
         x = self.bn0(x)
@@ -1224,6 +1228,7 @@ class HTSAT_Swin_Transformer(nn.Module):
             "fine_grained_embedding": latent_output,
         }
         return output_dict
+
 
 
 
