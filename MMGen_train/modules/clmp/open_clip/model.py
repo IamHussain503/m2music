@@ -784,15 +784,19 @@ class CLAP(nn.Module):
     def get_audio_embedding(self, data):
         device = next(self.parameters()).device
         audio_features = self.encode_audio(data, device=device)["embedding"]
-        
-        # Debugging: Check dimensions
-        print(f"Shape of audio_features: {audio_features.shape}")
-        print(f"Expected input shape for audio_projection: {self.audio_projection[0].in_features}x{self.audio_projection[0].out_features}")
 
+        # Adjust audio_features to match audio_projection input size
+        audio_features = self.audio_pre_projection(audio_features)
+        
+        # Debugging: Check dimensions after pre-projection
+        print(f"Shape of audio_features after pre-projection:;;;;;;;;;;;;;;;;;;;;;;;;; {audio_features.shape}")
+
+        # Pass through audio_projection
         audio_embeds = self.audio_projection(audio_features)
         audio_embeds = F.normalize(audio_embeds, dim=-1)
 
         return audio_embeds
+
 
 
     def audio_infer(self, audio, hopsize=None, device=None):
