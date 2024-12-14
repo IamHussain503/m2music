@@ -1144,10 +1144,13 @@ class HTSAT_Swin_Transformer(nn.Module):
             print("Using default fallback for mel_fusion.")
             x = x["waveform"].to(device=device, non_blocking=True)
 
-            # Convert from 4D to 3D by flattening time and frequency
-            if x.dim() == 4:  # Shape: [batch_size, 1, time, freq]
-                batch_size, channels, time, freq = x.shape
-                x = x.view(batch_size, 1, -1)  # Shape: [batch_size, 1, samples]
+            # Reshape fallback tensor to (batch_size, 1, samples)
+            if x.dim() == 3:  # Shape: [batch_size, time, freq]
+                batch_size, time, freq = x.shape
+                x = x.view(batch_size, 1, -1)  # Flatten time and freq into samples
+            elif x.dim() == 2:  # Shape: [time, freq]
+                x = x.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
+                x = x.view(1, 1, -1)  # Flatten into (1, 1, samples)
 
             print(f"Shape of fallback x (waveform): {x.shape}")
 
@@ -1213,6 +1216,7 @@ class HTSAT_Swin_Transformer(nn.Module):
             "fine_grained_embedding": latent_output,
         }
         return output_dict
+
 
 
 
