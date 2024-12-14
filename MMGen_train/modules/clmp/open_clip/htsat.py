@@ -912,6 +912,18 @@ class HTSAT_Swin_Transformer(nn.Module):
             fusion_type=self.fusion_type,
         )
 
+        # Define convolutional blocks (conv_block1 through conv_block6)
+        self.conv_block1 = self._create_conv_block(1, 32, pool=True)
+        self.conv_block2 = self._create_conv_block(32, 64, pool=True)
+        self.conv_block3 = self._create_conv_block(64, 128, pool=True)
+        self.conv_block4 = self._create_conv_block(128, 256, pool=True)
+        self.conv_block5 = self._create_conv_block(256, 512, pool=True)
+        self.conv_block6 = self._create_conv_block(512, 512, pool=False)
+
+        # Fully connected layer for latent feature processing
+        self.fc1 = nn.Linear(512, 512)
+        self.fc_audioset = nn.Linear(512, num_classes)
+
         num_patches = self.patch_embed.num_patches
         patches_resolution = self.patch_embed.grid_size
         self.patches_resolution = patches_resolution
@@ -1000,6 +1012,17 @@ class HTSAT_Swin_Transformer(nn.Module):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
 
+    def _create_conv_block(self, in_channels, out_channels, pool=True):
+        """Helper function to create a convolutional block."""
+        layers = [
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+        ]
+        if pool:
+            layers.append(nn.MaxPool2d(kernel_size=2, stride=2))
+        return nn.Sequential(*layers)
+
     @torch.jit.ignore
     def no_weight_decay(self):
         return {"absolute_pos_embed"}
@@ -1058,6 +1081,50 @@ class HTSAT_Swin_Transformer(nn.Module):
             "embedding": latent_output,
         }
 
+        # Apply SpecAugmentation during training
+        if self.training:
+            x = self.spec_augmenter(x)
+
+        # Process through convolutional blocks
+        x = self.conv_block1(x)
+        x = F.dropout(x, p=0.2, training=self.training)
+        x = self.conv_block2(x)
+        x = F.dropout(x, p=0.2, training=self.training)
+        x = self.conv_block3(x)
+        x = F.dropout(x, p=0.2, training=self.training)
+        x = self.conv_block4(x)
+        x = F.dropout(x, p=0.2, training=self.training)
+        x = self.conv_block5(x)
+        x = F.dropout(x, p=0.2, training=self.training)
+        x = self.conv_block6(x)
+        x = F.dropout(x, p=0.2, training=self.training)
+
+        # Pooling
+        x = torch.mean(x, dim=3)
+
+        # Latent features
+        latent_x1 = F.max_pool1d(x, kernel_size=3, stride=1, padding=1)
+        latent_x2 = F.avg_pool1d(x, kernel_size=3, stride=1, padding=1)
+        latent_x = latent_x1 + latent_x2
+        latent_x = latent_x.transpose(1, 2)
+        latent_x = F.relu_(self.fc1(latent_x))
+        latent_output = interpolate(latent_x, 32)
+
+        # Final output
+        x1, _ = torch.max(x, dim=2)
+        x2 = torch.mean(x, dim=2)
+        x = x1 + x2
+        x = F.dropout(x, p=0.5, training=self.training)
+        x = F.relu_(self.fc1(x))
+        embedding = F.dropout(x, p=0.5, training=self.training)
+        clipwise_output = torch.sigmoid(self.fc_audioset(x))
+
+        # Return the model outputs
+        output_dict = {
+            "clipwise_output": clipwise_output,
+            "embedding": embedding,
+            "fine_grained_embedding": latent_output,
+        }
         return output_dict
 
     def crop_wav(self, x, crop_size, spe_pos=None):
