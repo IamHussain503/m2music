@@ -913,12 +913,13 @@ class HTSAT_Swin_Transformer(nn.Module):
         )
 
         # Define convolutional blocks (conv_block1 through conv_block6)
-        self.conv_block1 = self._create_conv_block(1, 32, pool=True)
-        self.conv_block2 = self._create_conv_block(32, 64, pool=True)
-        self.conv_block3 = self._create_conv_block(64, 128, pool=True)
-        self.conv_block4 = self._create_conv_block(128, 256, pool=True)
-        self.conv_block5 = self._create_conv_block(256, 512, pool=True)
-        self.conv_block6 = self._create_conv_block(512, 512, pool=False)
+        self.conv_block1 = self._create_conv_block(1, 32, pool_size=(2, 2), pool_type="avg")
+        self.conv_block2 = self._create_conv_block(32, 64, pool_size=(2, 2), pool_type="avg")
+        self.conv_block3 = self._create_conv_block(64, 128, pool_size=(2, 2), pool_type="avg")
+        self.conv_block4 = self._create_conv_block(128, 256, pool_size=(2, 2), pool_type="avg")
+        self.conv_block5 = self._create_conv_block(256, 512, pool_size=(2, 2), pool_type="avg")
+        self.conv_block6 = self._create_conv_block(512, 512, pool_size=None)  # No pooling here
+
 
         # Fully connected layer for latent feature processing
         self.fc1 = nn.Linear(512, 512)
@@ -1012,15 +1013,20 @@ class HTSAT_Swin_Transformer(nn.Module):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
 
-    def _create_conv_block(self, in_channels, out_channels, pool=True):
+    def _create_conv_block(self, in_channels, out_channels, pool_size=None, pool_type="avg"):
         """Helper function to create a convolutional block."""
         layers = [
             nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
         ]
-        if pool:
-            layers.append(nn.MaxPool2d(kernel_size=2, stride=2))
+        if pool_size:
+            if pool_type == "avg":
+                layers.append(nn.AvgPool2d(kernel_size=pool_size, stride=pool_size))
+            elif pool_type == "max":
+                layers.append(nn.MaxPool2d(kernel_size=pool_size, stride=pool_size))
+            else:
+                raise ValueError(f"Unsupported pool_type: {pool_type}")
         return nn.Sequential(*layers)
 
     @torch.jit.ignore
@@ -1255,18 +1261,19 @@ class HTSAT_Swin_Transformer(nn.Module):
             x = self.spec_augmenter(x)
 
         # Convolutional blocks
-        x = self.conv_block1(x, pool_size=(2, 2), pool_type="avg")
+        x = self.conv_block1(x)
         x = F.dropout(x, p=0.2, training=self.training)
-        x = self.conv_block2(x, pool_size=(2, 2), pool_type="avg")
+        x = self.conv_block2(x)
         x = F.dropout(x, p=0.2, training=self.training)
-        x = self.conv_block3(x, pool_size=(2, 2), pool_type="avg")
+        x = self.conv_block3(x)
         x = F.dropout(x, p=0.2, training=self.training)
-        x = self.conv_block4(x, pool_size=(2, 2), pool_type="avg")
+        x = self.conv_block4(x)
         x = F.dropout(x, p=0.2, training=self.training)
-        x = self.conv_block5(x, pool_size=(2, 2), pool_type="avg")
+        x = self.conv_block5(x)
         x = F.dropout(x, p=0.2, training=self.training)
-        x = self.conv_block6(x, pool_size=(1, 1), pool_type="avg")
+        x = self.conv_block6(x)
         x = F.dropout(x, p=0.2, training=self.training)
+
 
         # Pooling
         x = torch.mean(x, dim=3)
