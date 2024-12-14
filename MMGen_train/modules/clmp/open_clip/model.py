@@ -446,6 +446,8 @@ class CLAP(nn.Module):
 
         self.context_length = text_cfg.context_length
         self.audio_projection_layer = nn.Linear(512, 1024)
+        self.audio_pre_projection = nn.Linear(512, 1024)
+
 
 
         # OpenAI models are pretrained w/ QuickGELU but native nn.GELU is both faster and more
@@ -699,58 +701,36 @@ class CLAP(nn.Module):
             raise RuntimeError(f"Model type {self.text_branch_type} not found.")
         return x
 
-    def forward(self, audio, text=None, device=None):
+    def forward(self, audio: torch.Tensor, text: Optional[torch.Tensor] = None, device: Optional[torch.device] = None):
         """
         Forward audio and text into the CLAP model.
-
-        Parameters
-        ----------
-        audio: torch.Tensor or dict
-            The time-domain audio input or a dictionary containing mel_spec and longer list.
-        text: torch.Tensor or dict, optional
-            The text token input (e.g., tokenized text).
-        device: torch.device, optional
-            The device on which computations will be performed.
         """
-        # Determine the device
-        if device is None:
-            if audio is not None:
-                device = audio.device
-            elif text is not None:
-                device = text.device
+        device = device or self.device
 
-        # Encode audio features
+        # Encode audio
         audio_features = self.encode_audio(audio, device=device)["embedding"]
-
-        # Apply projection layer for compatibility with audio_projection
-        if audio_features.shape[-1] == 512:  # Check if projection is needed
-            audio_features = self.audio_projection_layer(audio_features)
-
-        # Normalize and project audio features
+        audio_features = self.audio_pre_projection(audio_features)
         audio_embeds = self.audio_projection(audio_features)
         audio_embeds = F.normalize(audio_embeds, dim=-1)
 
-        # Process text features if text is provided
+        # Encode text (if available)
+        text_features, text_features_mlp = None, None
         if text is not None:
             text_features = self.encode_text(text, device=device)
             text_features = F.normalize(text_features, dim=-1)
             text_features_mlp = self.text_transform(text_features)
-        else:
-            text_features = None
-            text_features_mlp = None
 
-        # Process audio MLP features
+        # Process MLP features for audio
         audio_features_mlp = self.audio_transform(audio_embeds)
 
-        # Check and process melody features if present in audio
+        # Handle melody (if present in audio)
         melody_features = None
         if isinstance(audio, dict) and "melody_text" in audio:
-            melody_features = self.encode_melody(audio["melody_text"], device=device)  # [batch_size, 1024]
+            melody_features = self.encode_melody(audio["melody_text"], device=device)
             melody_features = self.melody_mlp_1024_to_768(melody_features)
             melody_features = self.melody_projection(melody_features)
             melody_features = F.normalize(melody_features, dim=-1)
 
-        # Return the model outputs
         return (
             melody_features,
             audio_embeds,
@@ -760,6 +740,8 @@ class CLAP(nn.Module):
             self.logit_scale_a.exp(),
             self.logit_scale_t.exp(),
         )
+
+
 
 
 
