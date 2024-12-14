@@ -1122,7 +1122,7 @@ class HTSAT_Swin_Transformer(nn.Module):
         x = x[:, :, :, cur_pos : cur_pos + self.spec_size]
         x = x.repeat(repeats=(1, 1, 4, 1))
         return x
-
+    
     def forward(self, x, *args, **kwargs):
         """
         Forward method for the HTSAT model.
@@ -1144,30 +1144,26 @@ class HTSAT_Swin_Transformer(nn.Module):
             print("Using default fallback for mel_fusion.")
             x = x["waveform"].to(device=device, non_blocking=True)
 
-            # Reshape fallback tensor to (batch_size, 1, samples)
-            if x.dim() == 3:  # Shape: [batch_size, time, freq]
-                batch_size, time, freq = x.shape
-                x = x.reshape(batch_size, 1, -1).contiguous()  # Flatten time and freq into samples
-            elif x.dim() == 2:  # Shape: [time, freq]
-                x = x.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
-                x = x.reshape(1, 1, -1).contiguous()  # Flatten into (1, 1, samples)
+            # Reshape fallback tensor to (batch_size, samples)
+            if x.dim() == 3:  # Shape: [batch_size, 1, samples]
+                x = x.squeeze(1)  # Remove the channel dimension
+            elif x.dim() == 2:  # Already in [batch_size, samples]
+                pass
+            else:
+                raise ValueError(f"Unexpected shape for waveform: {x.shape}")
 
             # Normalize waveform (e.g., to [-1, 1])
-            x = x / x.abs().max()
+            x = x / x.abs().max(dim=1, keepdim=True)[0]
 
             print(f"Shape of fallback x (waveform): {x.shape}")
-            print(f"Tensor content (sample): {x[:, :, :10]}")  # Print sample values for debugging
-
-        # Validate dimensions before spectrogram extraction
-        if x.dim() != 3:
-            raise ValueError(f"Expected 3D input tensor but got shape: {x.shape}")
+            print(f"Tensor content (sample): {x[:, :10]}")  # Print sample values for debugging
 
         # Spectrogram extraction
-        x = self.spectrogram_extractor(x)  # (batch_size, 1, time_steps, freq_bins)
+        x = self.spectrogram_extractor(x)  # (batch_size, time_steps, freq_bins)
         print(f"Shape after spectrogram extraction: {x.shape}")
 
         # Logmel feature extraction
-        x = self.logmel_extractor(x)  # (batch_size, 1, time_steps, mel_bins)
+        x = self.logmel_extractor(x.unsqueeze(1))  # Add channel dimension for logmel
         print(f"Shape after logmel extraction: {x.shape}")
 
         # Further processing
@@ -1220,6 +1216,8 @@ class HTSAT_Swin_Transformer(nn.Module):
             "fine_grained_embedding": latent_output,
         }
         return output_dict
+
+
 
 
 
