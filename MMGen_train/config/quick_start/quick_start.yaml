@@ -53,7 +53,7 @@ model:
       base_learning_rate: 8.0e-06
       target: MMGen_train.modules.latent_encoder.autoencoder.AutoencoderKL
       params: 
-        reload_from_ckpt: "data/checkpoints/mmgen_vae_16k_64bins.ckpt"
+        reload_from_ckpt: "/root/Awesome-Music-Generation/data/checkpoints/mg2_vae_16k_64bins.ckpt"
         sampling_rate: *sampling_rate
         batchsize: 4
         monitor: val/rec_loss
@@ -135,7 +135,7 @@ model:
         conditioning_key: film
         target: MMGen_train.conditional_models.CLAPAudioEmbeddingClassifierFreev2
         params:
-          pretrained_path: data/checkpoints/mmgen-clmp.pt
+          pretrained_path: /root/backup_m2music/checkpoints/clmp_epoch_30.pth
           sampling_rate: 16000
           embed_mode: text # or text
           amodel: HTSAT-base
