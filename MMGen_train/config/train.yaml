@@ -1,5 +1,5 @@
 metadata_root: "/root/AudioLDM-training-finetuning/data/dataset/metadata/dataset_root.json"
-log_directory: "./log/latent_diffusion"
+log_directory: "./logs/latent_diffusion"
 project: "your_project"
 precision: "high"
 
@@ -24,7 +24,7 @@ data:
 step:
   validation_every_n_epochs: 1
   save_checkpoint_every_n_steps: 100
-  # limit_val_batches: 2
+  limit_val_batches: 2
   max_steps: 1000
   save_top_k: 1
 
