@@ -1,4 +1,4 @@
-name: MMGen_quickstart
+name: music
 channels:
   - https://mirrors.pku.edu.cn/anaconda/cloud/conda-forge
   - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/msys2
