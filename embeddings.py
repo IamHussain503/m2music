@@ -105,24 +105,42 @@ class CLaMP(nn.Module):
         self.audio_proj = nn.Linear(audio_hidden_size, embedding_dim)
         self.text_proj = nn.Linear(text_hidden_size, embedding_dim)
 
-        # Melody encoder: simplified to match checkpoint
-        self.melody_proj = nn.Linear(32, embedding_dim)  # Matches checkpoint structure
+        # Melody encoder (matches checkpoint exactly)
+        self.melody_encoder = nn.ModuleDict({
+            "pitch_emb": nn.Embedding(128, 64),  # Matches checkpoint shape [128, 64]
+            "duration_emb": nn.Embedding(512, 64),  # Matches checkpoint shape [512, 64]
+            "mlp": nn.Sequential(
+                nn.Linear(128, 256),  # Matches checkpoint shape
+                nn.ReLU(),
+                nn.Linear(256, 768),  # Matches checkpoint shape
+                nn.ReLU(),
+                nn.Linear(768, embedding_dim)  # Matches final embedding dimension
+            )
+        })
 
     def forward(self, inputs):
         # Audio features
         audio_inputs = inputs['input_features']
         audio_outputs = self.audio_model(input_features=audio_inputs)
-        audio_features = audio_outputs.last_hidden_state.mean(dim=(-2, -1))
+        audio_features = audio_outputs.last_hidden_state.mean(dim=(-2, -1))  # Global average pooling
         audio_embeddings = self.audio_proj(audio_features)
 
         # Melody features
         melody_input = inputs['melody_embedding']  # Shape: (batch_size, 32)
-        melody_embeddings = self.melody_proj(melody_input)  # Matches checkpoint structure
+        pitch = melody_input[:, ::2].long()  # Extract pitches (even indices)
+        duration = melody_input[:, 1::2].long()  # Extract durations (odd indices)
+
+        # Pass through melody encoder
+        pitch_emb = self.melody_encoder["pitch_emb"](pitch)  # Shape: (batch_size, 16, 64)
+        duration_emb = self.melody_encoder["duration_emb"](duration)  # Shape: (batch_size, 16, 64)
+        melody_features = torch.cat((pitch_emb, duration_emb), dim=-1)  # Combine embeddings
+        melody_features = melody_features.mean(dim=1)  # Pool across sequence dimension
+        melody_embeddings = self.melody_encoder["mlp"](melody_features)  # Pass through MLP
 
         # Text features
         text_inputs = {'input_ids': inputs['input_ids'], 'attention_mask': inputs['attention_mask']}
         text_outputs = self.text_model(**text_inputs)
-        text_features = text_outputs.last_hidden_state.mean(dim=1)
+        text_features = text_outputs.last_hidden_state.mean(dim=1)  # Pool across sequence length
         text_embeddings = self.text_proj(text_features)
 
         # Combine embeddings
