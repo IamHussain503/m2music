@@ -105,8 +105,18 @@ class CLaMP(nn.Module):
         self.audio_proj = nn.Linear(audio_hidden_size, embedding_dim)
         self.text_proj = nn.Linear(text_hidden_size, embedding_dim)
 
-        # Melody projection layer (matches checkpoint structure)
-        self.melody_proj = nn.Linear(32, embedding_dim)
+        # Melody encoder: matches checkpoint structure
+        self.melody_encoder = nn.ModuleDict({
+            "pitch_emb": nn.Embedding(128, 768),  # Matches checkpoint
+            "duration_emb": nn.Embedding(512, 768),  # Matches checkpoint
+            "mlp": nn.Sequential(
+                nn.Linear(768, 256),
+                nn.ReLU(),
+                nn.Linear(256, 768),
+                nn.ReLU(),
+                nn.Linear(768, embedding_dim)
+            )
+        })
 
     def forward(self, inputs):
         # Audio features
@@ -117,7 +127,14 @@ class CLaMP(nn.Module):
 
         # Melody features
         melody_input = inputs['melody_embedding']  # Shape: (batch_size, 32)
-        melody_embeddings = self.melody_proj(melody_input)
+        pitch = melody_input[:, ::2].long()  # Even indices: pitch
+        duration = melody_input[:, 1::2].long()  # Odd indices: duration
+
+        pitch_emb = self.melody_encoder["pitch_emb"](pitch)  # Shape: (batch_size, 16, 768)
+        duration_emb = self.melody_encoder["duration_emb"](duration)  # Shape: (batch_size, 16, 768)
+
+        melody_features = (pitch_emb + duration_emb).mean(dim=1)  # Combine embeddings and pool
+        melody_embeddings = self.melody_encoder["mlp"](melody_features)  # Final projection
 
         # Text features
         text_inputs = {'input_ids': inputs['input_ids'], 'attention_mask': inputs['attention_mask']}
