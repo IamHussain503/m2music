@@ -8,6 +8,7 @@ from transformers import AutoModel, AutoProcessor
 from torch.utils.data import Dataset, DataLoader
 import argparse
 
+
 class AudioTextMelodyDataset(Dataset):
     def __init__(self, audio_dir, melodies_dir, captions_file, processor):
         self.audio_dir = audio_dir
@@ -89,6 +90,7 @@ class AudioTextMelodyDataset(Dataset):
         melody = np.array(melody, dtype=np.float32)
         return torch.tensor(melody, dtype=torch.float32)
 
+
 class CLaMP(nn.Module):
     def __init__(self, clap_model, embedding_dim=512):
         super(CLaMP, self).__init__()
@@ -99,10 +101,20 @@ class CLaMP(nn.Module):
         audio_hidden_size = self.audio_model.config.hidden_size
         text_hidden_size = self.text_model.config.hidden_size
 
-        # Projection layers for audio, text, and melody
+        # Projection layers for audio and text
         self.audio_proj = nn.Linear(audio_hidden_size, embedding_dim)
         self.text_proj = nn.Linear(text_hidden_size, embedding_dim)
-        self.melody_proj = nn.Linear(32, embedding_dim)  # Melody embedding size is fixed at 32
+
+        # Melody encoder (matches checkpoint structure)
+        self.melody_encoder = nn.ModuleDict({
+            "pitch_emb": nn.Embedding(128, 768),
+            "duration_emb": nn.Embedding(128, 768),
+            "mlp": nn.Sequential(
+                nn.Linear(768, 768),
+                nn.ReLU(),
+                nn.Linear(768, embedding_dim)
+            )
+        })
 
     def forward(self, inputs):
         # Audio features
@@ -112,8 +124,13 @@ class CLaMP(nn.Module):
         audio_embeddings = self.audio_proj(audio_features)
 
         # Melody features
-        melody_embedding = inputs['melody_embedding']
-        melody_embeddings = self.melody_proj(melody_embedding)
+        melody_input = inputs['melody_embedding']  # Shape: (batch_size, 32)
+        pitch = melody_input[:, ::2].long()  # Even indices: pitch
+        duration = melody_input[:, 1::2].long()  # Odd indices: duration
+        pitch_emb = self.melody_encoder["pitch_emb"](pitch)
+        duration_emb = self.melody_encoder["duration_emb"](duration)
+        melody_features = (pitch_emb + duration_emb).mean(dim=1)
+        melody_embeddings = self.melody_encoder["mlp"](melody_features)
 
         # Text features
         text_inputs = {'input_ids': inputs['input_ids'], 'attention_mask': inputs['attention_mask']}
@@ -124,6 +141,7 @@ class CLaMP(nn.Module):
         # Combine embeddings
         combined_embeddings = torch.cat((audio_embeddings, melody_embeddings, text_embeddings), dim=1)
         return combined_embeddings
+
 
 def main():
     parser = argparse.ArgumentParser(description="Batch Embeddings Extraction")
@@ -184,6 +202,7 @@ def main():
     np.save(os.path.join(args.output_dir, "text_embeddings.npy"), text_embeddings)
 
     print("Embeddings saved successfully!")
+
 
 if __name__ == '__main__':
     main()
