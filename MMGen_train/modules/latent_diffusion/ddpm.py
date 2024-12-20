@@ -1806,7 +1806,7 @@ class LatentDiffusion(DDPM):
             
             elif type(name) is list:
                 max_filename_length = 30  
-                truncated_basename = self.truncate_filename(os.path.basename(name[0]), max_filename_length)
+                truncated_basename = self.truncate_filename(os.path.basename(name[i]), max_filename_length)
 
                 # path = os.path.join(
                 #     savepath,
