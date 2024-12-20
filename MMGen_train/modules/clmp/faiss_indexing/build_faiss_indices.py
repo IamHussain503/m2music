@@ -68,11 +68,11 @@ def save_index(index, index_path):
 
 if __name__ == "__main__":
     # Load data
-    melody_data = np.load('/root/m2music/clm_data/embeddings/melody_embeddings.npy')
+    melody_data = np.load('/root/m2music/data/embeddings/melody_embeddings.npy')
     print("melody_data loaded")
-    audio_data = np.load('/root/m2music/clm_data/embeddings/audio_embeddings.npy')
+    audio_data = np.load('/root/m2music/data/embeddings/audio_embeddings.npy')
     print("audio_data loaded")
-    audio_queries = np.load('/root/m2music/clm_data/embeddings/text_embeddings.npy')
+    audio_queries = np.load('/root/m2music/data/embeddings/text_embeddings.npy')
     print("audio_queries loaded")
     
     # HNSW parameters
