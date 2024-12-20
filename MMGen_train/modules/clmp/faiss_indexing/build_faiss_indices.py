@@ -99,7 +99,7 @@ if __name__ == "__main__":
     print(f"Audio to melody search time: {validation_result['audio_to_melody_search_time']:.6f} seconds")
 
     # Save index
-    save_path = '/root/m2music/clm_data/faiss'
+    save_path = '/root/m2music/data/faiss'
 
     melody_index_path = os.path.join(save_path, f'audio_2_melody_{file_suffix}.faiss')
     print("Saving melody HNSW index...")
