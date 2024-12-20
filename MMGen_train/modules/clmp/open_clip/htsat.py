@@ -1229,6 +1229,11 @@ class HTSAT_Swin_Transformer(nn.Module):
             # Normalize waveform (e.g., to [-1, 1])
             x = x / x.abs().max(dim=1, keepdim=True)[0]
 
+            # Replace NaN values with 0
+            if torch.isnan(x).any():
+                print("NaN values detected in waveform. Replacing NaNs with zeros.")
+                x = torch.where(torch.isnan(x), torch.tensor(0.0, device=x.device), x)
+
             # Ensure tensor is contiguous
             x = x.contiguous()
 
@@ -1274,7 +1279,6 @@ class HTSAT_Swin_Transformer(nn.Module):
         x = self.conv_block6(x)
         x = F.dropout(x, p=0.2, training=self.training)
 
-
         # Pooling
         x = torch.mean(x, dim=3)
 
@@ -1302,6 +1306,113 @@ class HTSAT_Swin_Transformer(nn.Module):
             "fine_grained_embedding": latent_output,
         }
         return output_dict
+
+    # def forward(self, x, *args, **kwargs):
+    #     """
+    #     Forward method for the HTSAT model.
+    #     Handles 'mel_fusion' and 'waveform' input types and ensures compatibility with further processing.
+    #     """
+    #     # Determine the device dynamically
+    #     device = kwargs.get("device", next(self.parameters()).device)
+
+    #     # Debugging: Check input type and keys
+    #     if not isinstance(x, dict):
+    #         raise TypeError(f"Expected 'x' to be a dictionary but got type {type(x)}.")
+    #     print(f"Keys in input x: {x.keys()}")
+
+    #     # Handle 'mel_fusion' or fallback to 'waveform'
+    #     if "mel_fusion" in x:
+    #         print("Using mel_fusion input.")
+    #         x = x["mel_fusion"].to(device=device, non_blocking=True)
+    #     else:
+    #         print("Using default fallback for mel_fusion.")
+    #         x = x["waveform"].to(device=device, non_blocking=True)
+
+    #         # Ensure waveform is reshaped to (batch_size, samples)
+    #         if x.dim() == 3:  # Shape: [batch_size, time, freq]
+    #             batch_size, time, freq = x.shape
+    #             x = x.reshape(batch_size, -1)  # Flatten time and freq into samples
+    #         elif x.dim() == 2:  # Already in [batch_size, samples]
+    #             pass
+    #         else:
+    #             raise ValueError(f"Unexpected shape for waveform: {x.shape}")
+
+    #         # Normalize waveform (e.g., to [-1, 1])
+    #         x = x / x.abs().max(dim=1, keepdim=True)[0]
+
+    #         # Ensure tensor is contiguous
+    #         x = x.contiguous()
+
+    #         print(f"Shape of fallback x (waveform): {x.shape}")
+    #         print(f"Tensor content (sample): {x[:, :10]}")  # Print sample values for debugging
+
+    #     # Validate dimensions before spectrogram extraction
+    #     if x.dim() != 2:
+    #         raise ValueError(f"Expected 2D input tensor for spectrogram extraction but got shape: {x.shape}")
+
+    #     # Spectrogram extraction
+    #     x = self.spectrogram_extractor(x)  # (batch_size, time_steps, freq_bins)
+    #     print(f"Shape after spectrogram extraction: {x.shape}")
+
+    #     # Logmel feature extraction
+    #     x = self.logmel_extractor(x.unsqueeze(1))  # Add channel dimension for logmel
+    #     print(f"Shape after logmel extraction: {x.shape}")
+
+    #     # Squeeze unnecessary dimension to match BatchNorm2d expectations
+    #     x = x.squeeze(2)
+    #     print(f"Shape after squeeze: {x.shape}")
+
+    #     # Further processing
+    #     x = x.transpose(1, 3)
+    #     x = self.bn0(x)
+    #     x = x.transpose(1, 3)
+
+    #     # Apply SpecAugmentation during training
+    #     if self.training:
+    #         x = self.spec_augmenter(x)
+
+    #     # Convolutional blocks
+    #     x = self.conv_block1(x)
+    #     x = F.dropout(x, p=0.2, training=self.training)
+    #     x = self.conv_block2(x)
+    #     x = F.dropout(x, p=0.2, training=self.training)
+    #     x = self.conv_block3(x)
+    #     x = F.dropout(x, p=0.2, training=self.training)
+    #     x = self.conv_block4(x)
+    #     x = F.dropout(x, p=0.2, training=self.training)
+    #     x = self.conv_block5(x)
+    #     x = F.dropout(x, p=0.2, training=self.training)
+    #     x = self.conv_block6(x)
+    #     x = F.dropout(x, p=0.2, training=self.training)
+
+
+    #     # Pooling
+    #     x = torch.mean(x, dim=3)
+
+    #     # Latent features
+    #     latent_x1 = F.max_pool1d(x, kernel_size=3, stride=1, padding=1)
+    #     latent_x2 = F.avg_pool1d(x, kernel_size=3, stride=1, padding=1)
+    #     latent_x = latent_x1 + latent_x2
+    #     latent_x = latent_x.transpose(1, 2)
+    #     latent_x = F.relu_(self.fc1(latent_x))
+    #     latent_output = interpolate(latent_x, 32)
+
+    #     # Final output
+    #     x1, _ = torch.max(x, dim=2)
+    #     x2 = torch.mean(x, dim=2)
+    #     x = x1 + x2
+    #     x = F.dropout(x, p=0.5, training=self.training)
+    #     x = F.relu_(self.fc1(x))
+    #     embedding = F.dropout(x, p=0.5, training=self.training)
+    #     clipwise_output = torch.sigmoid(self.fc_audioset(x))
+
+    #     # Return the model outputs
+    #     output_dict = {
+    #         "clipwise_output": clipwise_output,
+    #         "embedding": embedding,
+    #         "fine_grained_embedding": latent_output,
+    #     }
+    #     return output_dict
 
 
 
