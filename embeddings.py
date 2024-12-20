@@ -389,10 +389,22 @@ def main():
     # model.eval()
     # Load checkpoint
     state_dict = torch.load(args.checkpoint, map_location=device)
-    if 'model_state_dict' in state_dict:
-        model.load_state_dict(state_dict['model_state_dict'])
-    else:
-        model.load_state_dict(state_dict)
+    # Remove unexpected keys
+    keys_to_remove = ["melody_encoder.pitch_emb.weight", "melody_encoder.duration_emb.weight",
+                    "melody_encoder.mlp.0.weight", "melody_encoder.mlp.0.bias",
+                    "melody_encoder.mlp.2.weight", "melody_encoder.mlp.2.bias"]
+    for key in keys_to_remove:
+        state_dict['model_state_dict'].pop(key, None)
+
+    # Fix size mismatch for melody_proj.weight
+    if "melody_proj.weight" in state_dict['model_state_dict']:
+        old_weight = state_dict['model_state_dict']["melody_proj.weight"]
+        new_weight = old_weight[:, :32]  # Slice to match new input size
+        state_dict['model_state_dict']["melody_proj.weight"] = new_weight
+
+    # Reload the adjusted checkpoint
+    model.load_state_dict(state_dict['model_state_dict'])
+
 
     model.eval()
 
