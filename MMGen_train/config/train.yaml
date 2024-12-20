@@ -1,4 +1,4 @@
-metadata_root: "/root/m2music/latent_data/datasets/audioset/metadata/dataset_root.json"
+metadata_root: "/root/m2music/latent_data/datasets/metadata/dataset_root.json"
 log_directory: "./logs/latent_diffusion"
 project: "your_project"
 precision: "high"
