@@ -389,6 +389,14 @@ def main():
     # model.eval()
     # Load checkpoint
     state_dict = torch.load(args.checkpoint, map_location=device)
+
+    # Check the shape of melody_proj weights in the checkpoint
+    if "melody_proj.weight" in state_dict['model_state_dict']:
+        print("Checkpoint weight shape::::::::::::::::::::::::::::::::", state_dict['model_state_dict']["melody_proj.weight"].shape)
+
+    # Check the shape of melody_proj weights in the model
+    print("Model melody_proj weight shape::::::::::::::::::::::::::::::::", model.melody_proj.weight.shape)
+
     # Remove unexpected keys
     keys_to_remove = ["melody_encoder.pitch_emb.weight", "melody_encoder.duration_emb.weight",
                     "melody_encoder.mlp.0.weight", "melody_encoder.mlp.0.bias",
