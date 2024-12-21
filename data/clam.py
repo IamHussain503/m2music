@@ -14,7 +14,7 @@ from transformers import AutoModel, AutoProcessor
 
 
 class MelodyEncoder(nn.Module):
-    def __init__(self, num_pitch=128, num_duration=512, pitch_emb_dim=64, dur_emb_dim=64, hidden_dim=256, proj_dim=768):
+    def __init__(self, num_pitch=128, num_duration=512, pitch_emb_dim=64, dur_emb_dim=64, hidden_dim=256, proj_dim=32):
         super(MelodyEncoder, self).__init__()
         self.pitch_emb = nn.Embedding(num_pitch, pitch_emb_dim)
         self.duration_emb = nn.Embedding(num_duration, dur_emb_dim)
@@ -57,7 +57,7 @@ class CLMPModel(nn.Module):
         self.audio_proj = nn.Linear(audio_hidden, final_dim)
         self.text_proj = nn.Linear(text_hidden, final_dim)
         # melody_encoder outputs a proj_dim (e.g. 768), adjust if different
-        self.melody_proj = nn.Linear(768, final_dim)
+        self.melody_proj = nn.Linear(32, final_dim)
 
     def forward(self, audio_features, input_ids, attention_mask, pitch_tokens, duration_tokens):
         # audio_features: dict returned by processor.feature_extractor with 'input_features'
