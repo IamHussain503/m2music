@@ -288,10 +288,10 @@ def main():
     criterion = SymmetricTripleContrastiveLoss(temperature=0.07)
     optimizer = torch.optim.AdamW(clmp_model.parameters(), lr=3e-4)
 
-    checkpoint_dir = "checkpoints"
+    checkpoint_dir = "clm_checkpoint"
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    num_epochs = 10
+    num_epochs = 13
     for epoch in range(num_epochs):
         avg_loss = train_one_epoch(clmp_model, dataloader, optimizer, criterion, device)
         print(f"Epoch {epoch+1}, Loss: {avg_loss:.4f}")
